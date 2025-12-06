@@ -7,6 +7,7 @@ use bevy::prelude::Single;
 use bevy::prelude::Time;
 use bevy::prelude::Transform;
 use bevy::prelude::Vec2;
+use bevy::prelude::Visibility;
 
 //use crate::PlanetEntities;
 //use crate::Planet;
@@ -51,6 +52,7 @@ use bevy::prelude::KeyCode;
 use bevy::prelude::With;
 
 use crate::Planet;
+use crate::PlanetDialog;
 
 #[derive(Component)]
 pub(crate) struct ReachedPlanet(pub(crate) bool);
@@ -90,6 +92,7 @@ pub fn check_explorer_reach(
     explorer_transform: Single<&Transform, With<Explorer>>,
     planet_query: Query<&Transform, With<Planet>>,
     reached: Query<Entity, With<ReachedPlanet>>,
+    mut dialog_query: Query<&mut Visibility, With<PlanetDialog>>,
 ) {
     let mut in_range = false;
     let mut is_left = false;
@@ -98,9 +101,9 @@ pub fn check_explorer_reach(
         let distance = explorer_transform
             .translation
             .distance(planet_transform.translation);
-        
+
         if distance < 50.0 {
-        is_left = explorer_transform.translation.x < planet_transform.translation.x;
+            is_left = explorer_transform.translation.x < planet_transform.translation.x;
             in_range = true;
             break;
         }
@@ -108,8 +111,16 @@ pub fn check_explorer_reach(
 
     if in_range && reached.is_empty() {
         println!("Explorer reached a planet!");
+        for mut visibility in &mut dialog_query {
+            *visibility = Visibility::Visible;
+        }
         commands.spawn(ReachedPlanet(is_left));
-    } else if !in_range && let Ok(entity) = reached.single() {
-        commands.entity(entity).despawn();
+    } else if !in_range {
+        for mut visibility in &mut dialog_query {
+            *visibility = Visibility::Hidden;
+        }
+        if let Ok(entity) = reached.single() {
+            commands.entity(entity).despawn();
+        }
     }
 }

@@ -13,6 +13,7 @@ use crate::resources::PlanetEntities;
 fn main() {
     App::new()
         .add_plugins(DefaultPlugins)
+        .init_state::<GameState>()
         .add_systems(Startup, setup)
         .add_systems(
             Update,
@@ -30,6 +31,28 @@ fn main() {
 
 #[derive(Component)]
 struct LogText;
+
+#[derive(Component)]
+struct PlanetDialog;
+
+// Marker components for buttons
+#[derive(Component)]
+struct YesButton;
+
+#[derive(Component)]
+struct NoButton;
+
+// Enum that will be used as a global state for the game
+#[derive(Clone, Copy, Default, Eq, PartialEq, Debug, Hash, States)]
+enum GameState {
+    #[default]
+    Splash,
+    Game,
+}
+
+const NORMAL_BUTTON: Color = Color::srgb(0.15, 0.15, 0.15);
+const HOVERED_BUTTON: Color = Color::srgb(0.25, 0.25, 0.25);
+const PRESSED_BUTTON: Color = Color::srgb(0.35, 0.75, 0.35);
 
 fn setup(mut commands: Commands) {
     // Camera
@@ -98,6 +121,9 @@ fn setup(mut commands: Commands) {
             ));
         });
 
+    // Spawn dialog UI
+    commands.spawn(dialog());
+
     // Resources
     commands.insert_resource(EventSpawnTimer(Timer::from_seconds(
         5.0,
@@ -106,4 +132,95 @@ fn setup(mut commands: Commands) {
     commands.insert_resource(PlanetEntities {
         planets: vec![planet1, planet2],
     });
+}
+
+fn check_entities_and_end_game(
+    planet: Query<&Planet>,
+    mut next_state: ResMut<NextState<GameState>>,
+) {
+    if planet.is_empty() {
+        // No player entity found → end game
+        next_state.set(GameState::Splash);
+    }
+}   
+
+fn dialog() -> impl Bundle {
+    (
+        Node {
+            position_type: PositionType::Absolute,
+            bottom: Val::Percent(35.0),
+            left: Val::Percent(35.0),
+            width: Val::Percent(40.0),
+            height: Val::Percent(40.0),
+            ..default()
+        },
+        BackgroundColor(Color::BLACK.with_alpha(0.7)),
+        PlanetDialog,
+        children![(
+            Node {
+                flex_direction: FlexDirection::Column,
+                padding: UiRect::all(Val::Px(20.0)),
+
+                justify_content: JustifyContent::SpaceBetween,
+                ..default()
+            },
+            BackgroundColor(Color::BLACK.with_alpha(0.7)),
+            children![
+                (
+                    Text::new("You have reached a planet do you want to land on it?"),
+                    TextFont::default().with_font_size(16.0),
+                    TextColor(Color::WHITE),
+                ),
+                (
+                    Node {
+                        flex_direction: FlexDirection::Row,
+                        justify_content: JustifyContent::SpaceBetween,
+                        ..default()
+                    },
+                    children![
+                        (
+                            Button,
+                            Node {
+                                width: px(150),
+                                height: px(65),
+                                border: UiRect::all(px(5)),
+                                // horizontally center child text
+                                justify_content: JustifyContent::Center,
+                                // vertically center child text
+                                align_items: AlignItems::Center,
+                                ..default()
+                            },
+                            BorderColor::all(Color::WHITE),
+                            YesButton,
+                            children![(
+                                Text::new("Yes"),
+                                TextFont::default().with_font_size(16.0),
+                                TextColor(Color::WHITE),
+                            )]
+                        ),
+                        (
+                            Button,
+                            Node {
+                                width: px(150),
+                                height: px(65),
+                                border: UiRect::all(px(5)),
+                                // horizontally center child text
+                                justify_content: JustifyContent::Center,
+                                // vertically center child text
+                                align_items: AlignItems::Center,
+                                ..default()
+                            },
+                            BorderColor::all(Color::WHITE),
+                            NoButton,
+                            children![(
+                                Text::new("No"),
+                                TextFont::default().with_font_size(16.0),
+                                TextColor(Color::WHITE),
+                            )],
+                        )
+                    ],
+                )
+            ],
+        )],
+    )
 }

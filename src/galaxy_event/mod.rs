@@ -55,36 +55,36 @@ pub fn event_spawner_system(
             // Choose random planet
             let planet_idx = rng.random_range(0..planet_entities.planets.len());
             let target_planet = planet_entities.planets[planet_idx];
-            let name = planet_query.get(target_planet).unwrap().name();
+            if let Ok(planet) = planet_query.get(target_planet) {
+                // Choose random event (33% each: Sunray, Asteroid, Nothing)
+                let log_message = match rng.random_range(0..3) {
+                    0 => {
+                        commands.spawn((
+                            GalaxyEvent::Sunray,
+                            EventTarget {
+                                planet: target_planet,
+                                duration: Timer::from_seconds(3.0, TimerMode::Once),
+                            },
+                        ));
+                        format!("☀️ Sunray approaching planet {}!", planet.name())
+                    }
+                    1 => {
+                        commands.spawn((
+                            GalaxyEvent::Asteroid,
+                            EventTarget {
+                                planet: target_planet,
+                                duration: Timer::from_seconds(3.0, TimerMode::Once),
+                            },
+                        ));
+                        format!("☄️ Asteroid approaching planet {}!", planet.name())
+                    }
+                    _ => "🌌 Nothing happening this cycle.".to_string(),
+                };
 
-            // Choose random event (33% each: Sunray, Asteroid, Nothing)
-            let log_message = match rng.random_range(0..3) {
-                0 => {
-                    commands.spawn((
-                        GalaxyEvent::Sunray,
-                        EventTarget {
-                            planet: target_planet,
-                            duration: Timer::from_seconds(3.0, TimerMode::Once),
-                        },
-                    ));
-                    format!("☀️ Sunray approaching planet {name}!")
+                // Update UI text instead of printing
+                if let Ok(mut text) = log_query.single_mut() {
+                    text.0 = format!("{}\n{}", log_message, text.0);
                 }
-                1 => {
-                    commands.spawn((
-                        GalaxyEvent::Asteroid,
-                        EventTarget {
-                            planet: target_planet,
-                            duration: Timer::from_seconds(3.0, TimerMode::Once),
-                        },
-                    ));
-                    format!("☄️ Asteroid approaching planet {name}!")
-                }
-                _ => "🌌 Nothing happening this cycle.".to_string(),
-            };
-
-            // Update UI text instead of printing
-            if let Ok(mut text) = log_query.single_mut() {
-                text.0 = format!("{}\n{}", log_message, text.0);
             }
         }
     }
@@ -128,6 +128,7 @@ pub fn event_visual_system(
 // ===== Event Handler System =====
 
 pub fn event_handler_system(
+    mut commands: Commands,
     time: Res<Time>,
     mut event_query: Query<(&GalaxyEvent, &mut EventTarget)>,
     planet_query: Query<&Planet>,
@@ -144,6 +145,7 @@ pub fn event_handler_system(
                     format!("✨ Sunray hit {}! Energy increased.", planet.name())
                 }
                 GalaxyEvent::Asteroid => {
+                    commands.entity(target.planet).despawn();
                     format!("💥 Asteroid hit {}! Damage taken.", planet.name())
                 }
             };
