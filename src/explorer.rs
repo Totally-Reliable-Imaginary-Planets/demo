@@ -1,13 +1,13 @@
 use bevy::prelude::Component;
-use bevy::prelude::Vec2;
-use bevy::prelude::Res;
+use bevy::prelude::Entity;
 use bevy::prelude::Query;
-use bevy::prelude::Transform;
+use bevy::prelude::Res;
 use bevy::prelude::Time;
+use bevy::prelude::Transform;
+use bevy::prelude::Vec2;
 
-use crate::Entity;
-use crate::planet::Planet;
 use crate::PlanetEntities;
+use crate::planet::Planet;
 
 #[derive(Component)]
 pub struct Explorer {
@@ -19,7 +19,7 @@ impl Explorer {
     pub fn new(target_planet: Option<Entity>, travel_speed: f32) -> Self {
         Self {
             target_planet,
-            travel_speed
+            travel_speed,
         }
     }
 }
