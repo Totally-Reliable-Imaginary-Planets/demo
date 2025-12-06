@@ -9,7 +9,10 @@ pub struct Planet {
 
 impl Planet {
     pub fn new(name: &str, position: Vec2) -> Self {
-        Self { name: name.to_string(), position }
+        Self {
+            name: name.to_string(),
+            position,
+        }
     }
 
     pub fn name(&self) -> String {

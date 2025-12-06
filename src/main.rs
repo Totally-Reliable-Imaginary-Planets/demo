@@ -2,8 +2,10 @@ use bevy::prelude::*;
 use rand::Rng;
 
 mod planet;
+mod explorer;
 
 use crate::planet::Planet;
+use crate::explorer::Explorer;
 
 fn main() {
     App::new()
@@ -12,7 +14,7 @@ fn main() {
         .add_systems(
             Update,
             (
-                explorer_movement_system,
+                explorer::explorer_movement_system,
                 event_spawner_system,
                 event_handler_system,
                 cleanup_events_system,
@@ -23,11 +25,6 @@ fn main() {
 }
 
 // ===== Components =====
-#[derive(Component)]
-struct Explorer {
-    target_planet: Option<Entity>,
-    travel_speed: f32,
-}
 
 #[derive(Component)]
 enum GalaxyEvent {
@@ -98,10 +95,10 @@ fn setup(mut commands: Commands) {
             ..default()
         },
         Transform::from_xyz(-300.0, 100.0, 1.0),
-        Explorer {
-            target_planet: Some(planet2),
-            travel_speed: 150.0,
-        },
+        Explorer::new(
+            Some(planet2),
+            150.0,
+        ),
     ));
 
     // Resources
@@ -112,42 +109,6 @@ fn setup(mut commands: Commands) {
     commands.insert_resource(PlanetEntities {
         planets: vec![planet1, planet2],
     });
-}
-
-// ===== Explorer Movement System =====
-
-fn explorer_movement_system(
-    time: Res<Time>,
-    mut explorer_query: Query<(&mut Transform, &mut Explorer)>,
-    planet_query: Query<&Planet>,
-    planet_entities: Res<PlanetEntities>,
-) {
-    for (mut transform, mut explorer) in explorer_query.iter_mut() {
-        if let Some(target_entity) = explorer.target_planet {
-            if let Ok(target_planet) = planet_query.get(target_entity) {
-                let current_pos = Vec2::new(transform.translation.x, transform.translation.y);
-                let direction = target_planet.position() - current_pos;
-                let distance = direction.length();
-
-                if distance > 5.0 {
-                    // Still traveling
-                    let movement =
-                        direction.normalize() * explorer.travel_speed * time.delta_secs();
-                    transform.translation.x += movement.x;
-                    transform.translation.y += movement.y;
-                } else {
-                    // Arrived, switch to other planet
-                    let other_planet = planet_entities
-                        .planets
-                        .iter()
-                        .find(|&&p| p != target_entity)
-                        .copied();
-                    explorer.target_planet = other_planet;
-                    println!("Explorer arrived at {}!", target_planet.name());
-                }
-            }
-        }
-    }
 }
 
 // ===== Event Spawner System =====
