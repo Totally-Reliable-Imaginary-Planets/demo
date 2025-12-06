@@ -42,8 +42,8 @@ use crate::Explorer;
     }
 }*/
 
-use bevy::prelude::KeyCode;
 use bevy::prelude::ButtonInput;
+use bevy::prelude::KeyCode;
 use bevy::prelude::With;
 
 pub fn explorer_movement_system_wasd(
@@ -57,8 +57,12 @@ pub fn explorer_movement_system_wasd(
 
     //if keyboard_input.pressed(KeyCode::KeyW) { direction.y += 1.0; }
     //if keyboard_input.pressed(KeyCode::KeyS) { direction.y -= 1.0; }
-    if keyboard_input.pressed(KeyCode::KeyA) { direction.x -= 1.0; }
-    if keyboard_input.pressed(KeyCode::KeyD) { direction.x += 1.0; }
+    if keyboard_input.pressed(KeyCode::KeyA) {
+        direction.x -= 1.0;
+    }
+    if keyboard_input.pressed(KeyCode::KeyD) {
+        direction.x += 1.0;
+    }
 
     if direction.length() > 0.0 {
         let movement = direction.normalize() * speed * time.delta_secs();

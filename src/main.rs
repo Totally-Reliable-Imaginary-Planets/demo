@@ -7,8 +7,8 @@ mod resources;
 
 use crate::explorer::Explorer;
 use crate::planet::Planet;
-use crate::resources::PlanetEntities;
 use crate::resources::EventSpawnTimer;
+use crate::resources::PlanetEntities;
 
 fn main() {
     App::new()
@@ -27,10 +27,13 @@ fn main() {
         .run();
 }
 
+#[derive(Component)]
+struct LogText;
+
 fn setup(mut commands: Commands) {
     // Camera
     commands.spawn((
-        Camera2d::default(),
+        Camera2d,
         Camera::default(),
         Transform::from_xyz(0.0, 0.0, 1000.0),
     ));
@@ -71,6 +74,28 @@ fn setup(mut commands: Commands) {
         Transform::from_xyz(-300.0, 0.0, 1.0),
         Explorer::new(Some(planet2), 150.0),
     ));
+
+    commands
+        .spawn((
+            Node {
+                position_type: PositionType::Absolute,
+                bottom: Val::Px(0.0),
+                left: Val::Percent(2.5),
+                width: Val::Percent(95.0),
+                height: Val::Percent(30.0),
+                overflow: Overflow::scroll_y(),
+                ..default()
+            },
+            BackgroundColor(Color::BLACK.with_alpha(0.7)),
+        ))
+        .with_children(|parent| {
+            parent.spawn((
+                Text::new(""),
+                TextFont::default().with_font_size(16.0),
+                TextColor(Color::WHITE),
+                LogText,
+            ));
+        });
 
     // Resources
     commands.insert_resource(EventSpawnTimer(Timer::from_seconds(
