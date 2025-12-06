@@ -1,6 +1,10 @@
 use bevy::prelude::*;
 use rand::Rng;
 
+mod planet;
+
+use crate::planet::Planet;
+
 fn main() {
     App::new()
         .add_plugins(DefaultPlugins)
@@ -19,13 +23,6 @@ fn main() {
 }
 
 // ===== Components =====
-
-#[derive(Component)]
-struct Planet {
-    name: String,
-    position: Vec2,
-}
-
 #[derive(Component)]
 struct Explorer {
     target_planet: Option<Entity>,
@@ -76,10 +73,7 @@ fn setup(mut commands: Commands) {
                 ..default()
             },
             Transform::from_xyz(-300.0, 0.0, 0.0),
-            Planet {
-                name: "Planet Alpha".to_string(),
-                position: Vec2::new(-300.0, 0.0),
-            },
+            Planet::new("Planet Alpha", Vec2::new(-300.0, 0.0)),
         ))
         .id();
 
@@ -92,10 +86,7 @@ fn setup(mut commands: Commands) {
                 ..default()
             },
             Transform::from_xyz(300.0, 0.0, 0.0),
-            Planet {
-                name: "Planet Beta".to_string(),
-                position: Vec2::new(300.0, 0.0),
-            },
+            Planet::new("Planet Beta", Vec2::new(300.0, 0.0)),
         ))
         .id();
 
@@ -135,7 +126,7 @@ fn explorer_movement_system(
         if let Some(target_entity) = explorer.target_planet {
             if let Ok(target_planet) = planet_query.get(target_entity) {
                 let current_pos = Vec2::new(transform.translation.x, transform.translation.y);
-                let direction = target_planet.position - current_pos;
+                let direction = target_planet.position() - current_pos;
                 let distance = direction.length();
 
                 if distance > 5.0 {
@@ -152,7 +143,7 @@ fn explorer_movement_system(
                         .find(|&&p| p != target_entity)
                         .copied();
                     explorer.target_planet = other_planet;
-                    println!("Explorer arrived at {}!", target_planet.name);
+                    println!("Explorer arrived at {}!", target_planet.name());
                 }
             }
         }
@@ -231,7 +222,7 @@ fn event_visual_system(
                     custom_size: Some(size),
                     ..default()
                 },
-                Transform::from_xyz(planet.position.x, planet.position.y + 100.0, 2.0),
+                Transform::from_xyz(planet.position().x, planet.position().y + 100.0, 2.0),
                 EventVisual,
             ));
         }
@@ -260,10 +251,10 @@ fn event_handler_system(
             if let Ok(planet) = planet_query.get(target.planet) {
                 match event {
                     GalaxyEvent::Sunray => {
-                        println!("✨ Sunray hit {}! Energy increased.", planet.name);
+                        println!("✨ Sunray hit {}! Energy increased.", planet.name());
                     }
                     GalaxyEvent::Asteroid => {
-                        println!("💥 Asteroid hit {}! Damage taken.", planet.name);
+                        println!("💥 Asteroid hit {}! Damage taken.", planet.name());
                     }
                 }
             }
