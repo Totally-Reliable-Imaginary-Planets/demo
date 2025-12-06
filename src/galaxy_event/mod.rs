@@ -145,7 +145,7 @@ pub fn event_handler_system(
                     format!("✨ Sunray hit {}! Energy increased.", planet.name())
                 }
                 GalaxyEvent::Asteroid => {
-                    commands.entity(target.planet).despawn();
+                    //commands.entity(target.planet).despawn();
                     format!("💥 Asteroid hit {}! Damage taken.", planet.name())
                 }
             };
