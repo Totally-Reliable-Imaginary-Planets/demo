@@ -1,5 +1,9 @@
+use bevy::prelude::Commands;
+use bevy::prelude::Component;
+use bevy::prelude::Entity;
 use bevy::prelude::Query;
 use bevy::prelude::Res;
+use bevy::prelude::Single;
 use bevy::prelude::Time;
 use bevy::prelude::Transform;
 use bevy::prelude::Vec2;
@@ -46,10 +50,16 @@ use bevy::prelude::ButtonInput;
 use bevy::prelude::KeyCode;
 use bevy::prelude::With;
 
+use crate::Planet;
+
+#[derive(Component)]
+pub(crate) struct ReachedPlanet(pub(crate) bool);
+
 pub fn explorer_movement_system_wasd(
     time: Res<Time>,
     mut explorer_query: Query<&mut Transform, With<Explorer>>,
     keyboard_input: Res<ButtonInput<KeyCode>>,
+    reached: Query<&ReachedPlanet>,
 ) {
     let mut transform = explorer_query.single_mut().unwrap();
     let speed = 150.0;
@@ -58,15 +68,48 @@ pub fn explorer_movement_system_wasd(
     //if keyboard_input.pressed(KeyCode::KeyW) { direction.y += 1.0; }
     //if keyboard_input.pressed(KeyCode::KeyS) { direction.y -= 1.0; }
     if keyboard_input.pressed(KeyCode::KeyA) {
-        direction.x -= 1.0;
+        if reached.single().map_or(true, |r| r.0) {
+            direction.x -= 1.0;
+        }
     }
     if keyboard_input.pressed(KeyCode::KeyD) {
-        direction.x += 1.0;
+        if !reached.single().map_or(false, |r| r.0) {
+            direction.x += 1.0;
+        }
     }
 
     if direction.length() > 0.0 {
         let movement = direction.normalize() * speed * time.delta_secs();
         transform.translation.x += movement.x;
         transform.translation.y += movement.y;
+    }
+}
+
+pub fn check_explorer_reach(
+    mut commands: Commands,
+    explorer_transform: Single<&Transform, With<Explorer>>,
+    planet_query: Query<&Transform, With<Planet>>,
+    reached: Query<Entity, With<ReachedPlanet>>,
+) {
+    let mut in_range = false;
+    let mut is_left = false;
+
+    for planet_transform in &planet_query {
+        let distance = explorer_transform
+            .translation
+            .distance(planet_transform.translation);
+        
+        if distance < 50.0 {
+        is_left = explorer_transform.translation.x < planet_transform.translation.x;
+            in_range = true;
+            break;
+        }
+    }
+
+    if in_range && reached.is_empty() {
+        println!("Explorer reached a planet!");
+        commands.spawn(ReachedPlanet(is_left));
+    } else if !in_range && let Ok(entity) = reached.single() {
+        commands.entity(entity).despawn();
     }
 }

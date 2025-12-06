@@ -18,6 +18,7 @@ fn main() {
             Update,
             (
                 explorer::movement::explorer_movement_system_wasd,
+                explorer::movement::check_explorer_reach,
                 galaxy_event::event_spawner_system,
                 galaxy_event::event_handler_system,
                 galaxy_event::cleanup_events_system,
@@ -71,7 +72,7 @@ fn setup(mut commands: Commands) {
             custom_size: Some(Vec2::new(30.0, 30.0)),
             ..default()
         },
-        Transform::from_xyz(-300.0, 0.0, 1.0),
+        Transform::from_xyz(0.0, 0.0, 1.0),
         Explorer::new(Some(planet2), 150.0),
     ));
 

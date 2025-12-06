@@ -17,3 +17,6 @@ impl Explorer {
         }
     }
 }
+
+#[derive(Component)]
+struct ReachedPlanet;
