@@ -128,7 +128,6 @@ pub fn event_visual_system(
 // ===== Event Handler System =====
 
 pub fn event_handler_system(
-    mut commands: Commands,
     time: Res<Time>,
     mut event_query: Query<(&GalaxyEvent, &mut EventTarget)>,
     planet_query: Query<&Planet>,

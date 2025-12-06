@@ -6,8 +6,9 @@ use crate::resources::EventSpawnTimer;
 use crate::resources::PlanetEntities;
 
 use crate::GameState;
-use crate::LogScreen;
 use crate::LogText;
+use crate::NoButton;
+use crate::YesButton;
 
 pub fn simulation_plugin(app: &mut App) {
     app.add_systems(OnEnter(GameState::Playing), setup)
@@ -21,6 +22,8 @@ pub fn simulation_plugin(app: &mut App) {
                 crate::galaxy_event::event_handler_system,
                 crate::galaxy_event::cleanup_events_system,
                 crate::galaxy_event::event_visual_system,
+                yes_button_system,
+                no_button_system,
             )
                 .run_if(in_state(GameState::Playing)),
         );
@@ -97,6 +100,29 @@ fn check_entities_and_end_game(
         // Update UI text instead of printing
         if let Ok(mut text) = log_query.single_mut() {
             text.0 = String::new();
+        }
+    }
+}
+
+fn yes_button_system(mut interaction_query: Query<(&Interaction, &mut Button), With<YesButton>>) {
+    for (interaction, _) in &mut interaction_query {
+        match *interaction {
+            Interaction::Pressed => {
+                println!("Yes!");
+            }
+            Interaction::Hovered => {}
+            Interaction::None => {}
+        }
+    }
+}
+fn no_button_system(mut interaction_query: Query<(&Interaction, &mut Button), With<NoButton>>) {
+    for (interaction, _) in &mut interaction_query {
+        match *interaction {
+            Interaction::Pressed => {
+                println!("No!");
+            }
+            Interaction::Hovered => {}
+            Interaction::None => {}
         }
     }
 }

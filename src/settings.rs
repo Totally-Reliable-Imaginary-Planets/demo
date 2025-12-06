@@ -1,5 +1,4 @@
 use super::GameState;
-use crate::LogText;
 use bevy::prelude::*;
 
 #[derive(Component)]
