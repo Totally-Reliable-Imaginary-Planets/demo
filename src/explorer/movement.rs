@@ -1,30 +1,14 @@
-use bevy::prelude::Component;
-use bevy::prelude::Entity;
 use bevy::prelude::Query;
 use bevy::prelude::Res;
 use bevy::prelude::Time;
 use bevy::prelude::Transform;
 use bevy::prelude::Vec2;
 
-use crate::PlanetEntities;
-use crate::planet::Planet;
+//use crate::PlanetEntities;
+//use crate::Planet;
+use crate::Explorer;
 
-#[derive(Component)]
-pub struct Explorer {
-    target_planet: Option<Entity>,
-    travel_speed: f32,
-}
-
-impl Explorer {
-    pub fn new(target_planet: Option<Entity>, travel_speed: f32) -> Self {
-        Self {
-            target_planet,
-            travel_speed,
-        }
-    }
-}
-
-pub fn explorer_movement_system(
+/*pub fn explorer_movement_system(
     time: Res<Time>,
     mut explorer_query: Query<(&mut Transform, &mut Explorer)>,
     planet_query: Query<&Planet>,
@@ -55,5 +39,30 @@ pub fn explorer_movement_system(
                 }
             }
         }
+    }
+}*/
+
+use bevy::prelude::KeyCode;
+use bevy::prelude::ButtonInput;
+use bevy::prelude::With;
+
+pub fn explorer_movement_system_wasd(
+    time: Res<Time>,
+    mut explorer_query: Query<&mut Transform, With<Explorer>>,
+    keyboard_input: Res<ButtonInput<KeyCode>>,
+) {
+    let mut transform = explorer_query.single_mut().unwrap();
+    let speed = 150.0;
+    let mut direction = Vec2::ZERO;
+
+    //if keyboard_input.pressed(KeyCode::KeyW) { direction.y += 1.0; }
+    //if keyboard_input.pressed(KeyCode::KeyS) { direction.y -= 1.0; }
+    if keyboard_input.pressed(KeyCode::KeyA) { direction.x -= 1.0; }
+    if keyboard_input.pressed(KeyCode::KeyD) { direction.x += 1.0; }
+
+    if direction.length() > 0.0 {
+        let movement = direction.normalize() * speed * time.delta_secs();
+        transform.translation.x += movement.x;
+        transform.translation.y += movement.y;
     }
 }

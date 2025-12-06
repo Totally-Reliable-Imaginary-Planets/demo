@@ -3,9 +3,12 @@ use bevy::prelude::*;
 mod explorer;
 mod galaxy_event;
 mod planet;
+mod resources;
 
 use crate::explorer::Explorer;
 use crate::planet::Planet;
+use crate::resources::PlanetEntities;
+use crate::resources::EventSpawnTimer;
 
 fn main() {
     App::new()
@@ -14,7 +17,7 @@ fn main() {
         .add_systems(
             Update,
             (
-                explorer::explorer_movement_system,
+                explorer::movement::explorer_movement_system_wasd,
                 galaxy_event::event_spawner_system,
                 galaxy_event::event_handler_system,
                 galaxy_event::cleanup_events_system,
@@ -23,18 +26,6 @@ fn main() {
         )
         .run();
 }
-
-// ===== Resources =====
-
-#[derive(Resource)]
-struct EventSpawnTimer(Timer);
-
-#[derive(Resource)]
-struct PlanetEntities {
-    planets: Vec<Entity>,
-}
-
-// ===== Setup System =====
 
 fn setup(mut commands: Commands) {
     // Camera
@@ -77,7 +68,7 @@ fn setup(mut commands: Commands) {
             custom_size: Some(Vec2::new(30.0, 30.0)),
             ..default()
         },
-        Transform::from_xyz(-300.0, 100.0, 1.0),
+        Transform::from_xyz(-300.0, 0.0, 1.0),
         Explorer::new(Some(planet2), 150.0),
     ));
 
@@ -90,5 +81,3 @@ fn setup(mut commands: Commands) {
         planets: vec![planet1, planet2],
     });
 }
-
-// ===== Event Spawner System =====
