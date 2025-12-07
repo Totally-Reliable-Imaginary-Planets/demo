@@ -9,6 +9,14 @@ pub struct Explorer {
     _travel_speed: f32,
 }
 
+#[derive(Component)]
+pub struct Roaming;
+
+#[derive(Component)]
+pub struct Landed {
+    pub(crate) planet: Entity,
+}
+
 impl Explorer {
     pub fn new(_target_planet: Option<Entity>, _travel_speed: f32) -> Self {
         Self {

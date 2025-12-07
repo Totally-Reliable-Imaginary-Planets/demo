@@ -36,6 +36,8 @@ pub struct LogText;
 
 #[derive(Component)]
 struct PlanetDialog;
+#[derive(Component)]
+struct LandedPlanetDialog;
 
 // Marker components for buttons
 #[derive(Component)]
@@ -43,6 +45,18 @@ struct YesButton;
 
 #[derive(Component)]
 struct NoButton;
+
+#[derive(Component)]
+struct SupportedResourceButton;
+
+#[derive(Component)]
+struct ExtractResourceButton;
+
+#[derive(Component)]
+struct AvailableEnergyCellButton;
+
+#[derive(Component)]
+struct TakeOffPlanetButton;
 
 fn setup(mut commands: Commands) {
     // Camera
@@ -71,16 +85,103 @@ fn setup(mut commands: Commands) {
         LogText,
     ));
 
-    // Spawn dialog UI
-    commands.spawn(dialog());
+    commands.spawn((
+        Node {
+            flex_direction: FlexDirection::Column,
+            position_type: PositionType::Absolute,
+            justify_content: JustifyContent::SpaceBetween,
+            bottom: Val::Percent(35.0),
+            left: Val::Percent(35.0),
+            width: Val::Percent(30.0),
+            height: Val::Percent(60.0),
+            ..default()
+        },
+        LandedPlanetDialog,
+        Visibility::Hidden,
+        BackgroundColor(Color::BLACK.with_alpha(0.7)),
+        children![
+            (Text::new("What would you do on this planet?"),),
+            (
+                Button,
+                SupportedResourceButton,
+                Node {
+                    width: Val::Percent(90.0),
+                    height: Val::Percent(15.0),
+                    left: Val::Percent(5.0),
+                    border: UiRect::all(px(5)),
+                    // horizontally center child text
+                    justify_content: JustifyContent::Center,
+                    // vertically center child text
+                    align_items: AlignItems::Center,
+                    ..default()
+                },
+                BorderColor::all(Color::WHITE),
+                children![(Text::new("Supported resource"))]
+            ),
+            (
+                Button,
+                ExtractResourceButton,
+                Node {
+                    width: Val::Percent(90.0),
+                    height: Val::Percent(15.0),
+                    left: Val::Percent(5.0),
+                    border: UiRect::all(px(5)),
+                    // horizontally center child text
+                    justify_content: JustifyContent::Center,
+                    // vertically center child text
+                    align_items: AlignItems::Center,
+                    ..default()
+                },
+                BorderColor::all(Color::WHITE),
+                children![(Text::new("Extract resource"))]
+            ),
+            (
+                Button,
+                AvailableEnergyCellButton,
+                Node {
+                    width: Val::Percent(90.0),
+                    height: Val::Percent(15.0),
+                    left: Val::Percent(5.0),
+                    border: UiRect::all(px(5)),
+                    // horizontally center child text
+                    justify_content: JustifyContent::Center,
+                    // vertically center child text
+                    align_items: AlignItems::Center,
+                    ..default()
+                },
+                BorderColor::all(Color::WHITE),
+                children![(Text::new("Available energy cell"))]
+            ),
+            (
+                Button,
+                TakeOffPlanetButton,
+                Node {
+                    width: Val::Percent(90.0),
+                    height: Val::Percent(15.0),
+                    left: Val::Percent(5.0),
+                    border: UiRect::all(px(5)),
+                    // horizontally center child text
+                    justify_content: JustifyContent::Center,
+                    // vertically center child text
+                    align_items: AlignItems::Center,
+                    ..default()
+                },
+                BorderColor::all(Color::WHITE),
+                children![(Text::new("Take off planet"))]
+            )
+        ],
+    ));
+
+    // Spawn land_on_planet_dialog UI
+    commands.spawn(land_on_planet_dialog());
 }
 
-fn dialog() -> impl Bundle {
+fn land_on_planet_dialog() -> impl Bundle {
     (
         Node {
             position_type: PositionType::Absolute,
-            bottom: Val::Percent(35.0),
-            left: Val::Percent(35.0),
+            bottom: Val::Percent(30.0),
+            left: Val::Percent(30.0),
             width: Val::Percent(40.0),
             height: Val::Percent(40.0),
             ..default()

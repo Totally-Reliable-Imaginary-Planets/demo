@@ -1,14 +1,18 @@
 use bevy::prelude::*;
 
 use crate::explorer::Explorer;
+use crate::explorer::Landed;
+use crate::explorer::Roaming;
 use crate::planet::Planet;
 use crate::resources::EventSpawnTimer;
 use crate::resources::PlanetEntities;
 
 use crate::GameState;
+use crate::LandedPlanetDialog;
 use crate::LogText;
 use crate::NoButton;
 use crate::PlanetDialog;
+use crate::TakeOffPlanetButton;
 use crate::YesButton;
 
 pub fn simulation_plugin(app: &mut App) {
@@ -17,6 +21,7 @@ pub fn simulation_plugin(app: &mut App) {
             Update,
             (
                 check_entities_and_end_game,
+                landed_dialog_visibility,
                 crate::explorer::movement::explorer_movement_system_wasd,
                 crate::explorer::movement::check_explorer_reach,
                 crate::galaxy_event::event_spawner_system,
@@ -25,10 +30,16 @@ pub fn simulation_plugin(app: &mut App) {
                 crate::galaxy_event::event_visual_system,
                 yes_button_system,
                 no_button_system,
+                take_off_button_system,
             )
                 .run_if(in_state(GameState::Playing)),
         );
 }
+
+#[derive(Component)]
+struct PlanetAlpha;
+#[derive(Component)]
+struct PlanetBeta;
 
 fn setup(mut commands: Commands, mut dialog_query: Query<&mut Visibility, With<LogText>>) {
     // Planets
@@ -39,8 +50,9 @@ fn setup(mut commands: Commands, mut dialog_query: Query<&mut Visibility, With<L
                 custom_size: Some(Vec2::new(80.0, 80.0)),
                 ..default()
             },
-            Transform::from_xyz(-300.0, 0.0, 0.0),
-            Planet::new("Planet Alpha", Vec2::new(-300.0, 0.0)),
+            Transform::from_xyz(-400.0, 0.0, 0.0),
+            Planet::new("Planet Alpha", Vec2::new(-400.0, 0.0)),
+            PlanetAlpha,
         ))
         .id();
 
@@ -51,8 +63,9 @@ fn setup(mut commands: Commands, mut dialog_query: Query<&mut Visibility, With<L
                 custom_size: Some(Vec2::new(80.0, 80.0)),
                 ..default()
             },
-            Transform::from_xyz(300.0, 0.0, 0.0),
-            Planet::new("Planet Beta", Vec2::new(300.0, 0.0)),
+            Transform::from_xyz(400.0, 0.0, 0.0),
+            Planet::new("Planet Beta", Vec2::new(400.0, 0.0)),
+            PlanetBeta,
         ))
         .id();
 
@@ -65,6 +78,7 @@ fn setup(mut commands: Commands, mut dialog_query: Query<&mut Visibility, With<L
         },
         Transform::from_xyz(0.0, 0.0, 1.0),
         Explorer::new(Some(planet2), 150.0),
+        Roaming,
     ));
 
     // Resources
@@ -105,38 +119,83 @@ fn check_entities_and_end_game(
     }
 }
 
+fn landed_dialog_visibility(
+    mut dialog_query: Query<&mut Visibility, With<LandedPlanetDialog>>,
+    explorer_roaming: Query<&Explorer, With<Roaming>>,
+) {
+    if explorer_roaming.is_empty() {
+        for mut visibility in &mut dialog_query {
+            *visibility = Visibility::Visible;
+        }
+    } else {
+        for mut visibility in &mut dialog_query {
+            *visibility = Visibility::Hidden;
+        }
+    }
+}
+
 fn yes_button_system(
+    mut commands: Commands,
     interaction_query: Query<&Interaction, (Changed<Interaction>, With<YesButton>)>,
+    explorer: Single<Entity, With<Roaming>>,
     mut explorer_query: Single<&mut Transform, With<Explorer>>,
+    planet_alpha_entity: Single<Entity, With<PlanetAlpha>>,
+    planet_beta_entity: Single<Entity, With<PlanetBeta>>,
+    planet_alpha: Single<&Transform, (With<PlanetAlpha>, Without<Explorer>)>,
+    planet_beta: Single<&Transform, (With<PlanetBeta>, Without<Explorer>)>,
     mut dialog_query: Query<&mut Visibility, With<PlanetDialog>>,
 ) {
     for interaction in &interaction_query {
         if *interaction == Interaction::Pressed {
-            handle_button_press(&mut explorer_query, &mut dialog_query, -300.0, 300.0);
-            info!("No button pressed");
+            let explorer_entity = *explorer;
+
+            // Determine target planet
+            let target_planet = if explorer_query.translation.x < 0.0 {
+                *planet_alpha_entity
+            } else {
+                *planet_beta_entity
+            };
+            commands.entity(explorer_entity).remove::<Roaming>();
+            commands.entity(explorer_entity).insert(Landed {
+                planet: target_planet,
+            });
+            handle_button_press(
+                &mut explorer_query,
+                &mut dialog_query,
+                planet_alpha.translation.x,
+                planet_beta.translation.x,
+            );
+            info!("Yes button pressed");
         }
     }
 }
 fn no_button_system(
     interaction_query: Query<&Interaction, (Changed<Interaction>, With<NoButton>)>,
     mut explorer_query: Single<&mut Transform, With<Explorer>>,
+    planet_alpha: Single<&Transform, (With<PlanetAlpha>, Without<Explorer>)>,
+    planet_beta: Single<&Transform, (With<PlanetBeta>, Without<Explorer>)>,
     mut dialog_query: Query<&mut Visibility, With<PlanetDialog>>,
 ) {
     for interaction in &interaction_query {
         if *interaction == Interaction::Pressed {
-            handle_button_press(&mut explorer_query, &mut dialog_query, -230.0, 230.0);
+            handle_button_press(
+                &mut explorer_query,
+                &mut dialog_query,
+                planet_alpha.translation.x + 70.0,
+                planet_beta.translation.x - 70.0,
+            );
             info!("No button pressed");
         }
     }
 }
 
 fn handle_button_press(
-    explorer: &mut Transform,
+    explorer_transform: &mut Transform,
     dialog_query: &mut Query<&mut Visibility, With<PlanetDialog>>,
     left_pos: f32,
     right_pos: f32,
 ) {
-    explorer.translation.x = if explorer.translation.x < 0.0 {
+    explorer_transform.translation.x = if explorer_transform.translation.x < 0.0 {
         left_pos
     } else {
         right_pos
@@ -144,5 +203,25 @@ fn handle_button_press(
 
     for mut visibility in dialog_query {
         *visibility = Visibility::Hidden;
+    }
+}
+
+fn take_off_button_system(
+    mut commands: Commands,
+    explorer: Single<Entity, With<Landed>>,
+    mut explorer_query: Single<&mut Transform, With<Explorer>>,
+    interaction_query: Query<&Interaction, (Changed<Interaction>, With<TakeOffPlanetButton>)>,
+) {
+    for interaction in &interaction_query {
+        if *interaction == Interaction::Pressed {
+            commands.entity(*explorer).remove::<Landed>();
+            commands.entity(*explorer).insert(Roaming);
+            explorer_query.translation.x = if explorer_query.translation.x < 0.0 {
+                explorer_query.translation.x + 70.0
+            } else {
+                explorer_query.translation.x - 70.0
+            };
+            info!("No button pressed");
+        }
     }
 }

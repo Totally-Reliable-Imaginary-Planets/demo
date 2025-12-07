@@ -53,6 +53,7 @@ use bevy::prelude::With;
 
 use crate::Planet;
 use crate::PlanetDialog;
+use crate::explorer::Roaming;
 
 #[derive(Component)]
 pub(crate) struct ReachedPlanet(pub(crate) bool);
@@ -60,6 +61,7 @@ pub(crate) struct ReachedPlanet(pub(crate) bool);
 pub fn explorer_movement_system_wasd(
     time: Res<Time>,
     mut explorer_query: Query<&mut Transform, With<Explorer>>,
+    roaming: Single<Entity, With<Roaming>>,
     keyboard_input: Res<ButtonInput<KeyCode>>,
     reached: Query<&ReachedPlanet>,
 ) {
