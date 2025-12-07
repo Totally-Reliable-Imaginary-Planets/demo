@@ -8,6 +8,7 @@ use crate::resources::PlanetEntities;
 use crate::GameState;
 use crate::LogText;
 use crate::NoButton;
+use crate::PlanetDialog;
 use crate::YesButton;
 
 pub fn simulation_plugin(app: &mut App) {
@@ -104,25 +105,44 @@ fn check_entities_and_end_game(
     }
 }
 
-fn yes_button_system(mut interaction_query: Query<(&Interaction, &mut Button), With<YesButton>>) {
-    for (interaction, _) in &mut interaction_query {
-        match *interaction {
-            Interaction::Pressed => {
-                println!("Yes!");
-            }
-            Interaction::Hovered => {}
-            Interaction::None => {}
+fn yes_button_system(
+    interaction_query: Query<&Interaction, (Changed<Interaction>, With<YesButton>)>,
+    mut explorer_query: Single<&mut Transform, With<Explorer>>,
+    mut dialog_query: Query<&mut Visibility, With<PlanetDialog>>,
+) {
+    for interaction in &interaction_query {
+        if *interaction == Interaction::Pressed {
+            handle_button_press(&mut explorer_query, &mut dialog_query, -300.0, 300.0);
+            info!("No button pressed");
         }
     }
 }
-fn no_button_system(mut interaction_query: Query<(&Interaction, &mut Button), With<NoButton>>) {
-    for (interaction, _) in &mut interaction_query {
-        match *interaction {
-            Interaction::Pressed => {
-                println!("No!");
-            }
-            Interaction::Hovered => {}
-            Interaction::None => {}
+fn no_button_system(
+    interaction_query: Query<&Interaction, (Changed<Interaction>, With<NoButton>)>,
+    mut explorer_query: Single<&mut Transform, With<Explorer>>,
+    mut dialog_query: Query<&mut Visibility, With<PlanetDialog>>,
+) {
+    for interaction in &interaction_query {
+        if *interaction == Interaction::Pressed {
+            handle_button_press(&mut explorer_query, &mut dialog_query, -230.0, 230.0);
+            info!("No button pressed");
         }
+    }
+}
+
+fn handle_button_press(
+    explorer: &mut Transform,
+    dialog_query: &mut Query<&mut Visibility, With<PlanetDialog>>,
+    left_pos: f32,
+    right_pos: f32,
+) {
+    explorer.translation.x = if explorer.translation.x < 0.0 {
+        left_pos
+    } else {
+        right_pos
+    };
+
+    for mut visibility in dialog_query {
+        *visibility = Visibility::Hidden;
     }
 }
