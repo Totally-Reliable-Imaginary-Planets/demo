@@ -358,39 +358,52 @@ fn check_status_changes(
     mut planet_beta_state: ResMut<PlanetBetaStateRes>,
     orch: Res<Orchestrator>,
 ) {
-    orch.orch_tx_p1
+    match orch
+        .orch_tx_p1
         .send(OrchestratorToPlanet::InternalStateRequest)
-        .expect("Failed to send start messages");
-    orch.orch_tx_p2
+    {
+        Ok(()) => {}
+        Err(e) => warn!("Encountered error {e} while sending message"),
+    }
+    match orch
+        .orch_tx_p2
         .send(OrchestratorToPlanet::InternalStateRequest)
-        .expect("Failed to send start messages");
+    {
+        Ok(()) => {}
+        Err(e) => warn!("Encountered error {e} while sending message"),
+    }
     match orch
         .planet_rx_p1
         .recv_timeout(std::time::Duration::from_millis(100))
-        .expect("No message received")
     {
-        PlanetToOrchestrator::InternalStateResponse {
-            planet_id,
-            planet_state,
-        } => {
-            planet_alpha_state.1 = planet_state.charged_cells_count;
-            planet_alpha_state.2 = planet_state.has_rocket;
-        }
-        _other => panic!("Failed to start planet"),
+        Ok(msg) => match msg {
+            PlanetToOrchestrator::InternalStateResponse {
+                planet_id,
+                planet_state,
+            } => {
+                planet_alpha_state.1 = planet_state.charged_cells_count;
+                planet_alpha_state.2 = planet_state.has_rocket;
+            }
+            _other => warn!("Wrong message received"),
+        },
+        Err(e) => warn!("An error occurred while waiting or request timed out"),
     }
+
     match orch
         .planet_rx_p2
         .recv_timeout(std::time::Duration::from_millis(100))
-        .expect("No message received")
     {
-        PlanetToOrchestrator::InternalStateResponse {
-            planet_id,
-            planet_state,
-        } => {
-            planet_beta_state.1 = planet_state.charged_cells_count;
-            planet_beta_state.2 = planet_state.has_rocket;
-        }
-        _other => panic!("Failed to start planet"),
+        Ok(msg) => match msg {
+            PlanetToOrchestrator::InternalStateResponse {
+                planet_id,
+                planet_state,
+            } => {
+                planet_beta_state.1 = planet_state.charged_cells_count;
+                planet_beta_state.2 = planet_state.has_rocket;
+            }
+            _other => warn!("Wrong message received"),
+        },
+        Err(e) => warn!("An error occurred while waiting or request timed out"),
     }
 }
 
