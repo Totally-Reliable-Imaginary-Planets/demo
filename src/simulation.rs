@@ -1,4 +1,5 @@
 use bevy::prelude::*;
+use common_game::components::resource::BasicResource;
 use common_game::components::resource::BasicResourceType;
 use common_game::protocols::messages::*;
 use crossbeam_channel::*;
@@ -11,14 +12,26 @@ use crate::resources::EventSpawnTimer;
 use crate::resources::PlanetEntities;
 
 use crate::AvailableEnergyCellButton;
+use crate::ExtractResourceButton;
 use crate::GameState;
 use crate::LandedPlanetDialog;
 use crate::LogText;
 use crate::NoButton;
+use crate::PlanetAlphaCell;
+use crate::PlanetAlphaRocket;
+use crate::PlanetAlphaState;
+use crate::PlanetBetaCell;
+use crate::PlanetBetaRocket;
+use crate::PlanetBetaState;
 use crate::PlanetDialog;
 use crate::SupportedResourceButton;
 use crate::TakeOffPlanetButton;
 use crate::YesButton;
+
+#[derive(Resource)]
+pub struct PlanetAlphaStateRes(usize, usize, bool);
+#[derive(Resource)]
+pub struct PlanetBetaStateRes(usize, usize, bool);
 
 pub fn simulation_plugin(app: &mut App) {
     app.add_systems(OnEnter(GameState::Playing), setup)
@@ -38,9 +51,57 @@ pub fn simulation_plugin(app: &mut App) {
                 take_off_button_system,
                 supported_resource_button_system,
                 available_energy_cell_button_system,
+                generate_supported_resource_button_system,
+                check_status_changes,
             )
                 .run_if(in_state(GameState::Playing)),
+        )
+        .add_systems(
+            Update,
+            update_planet_beta_ui.run_if(resource_changed::<PlanetBetaStateRes>),
+        )
+        .add_systems(
+            Update,
+            update_planet_alpha_ui.run_if(resource_changed::<PlanetAlphaStateRes>),
         );
+}
+
+// Update system for Planet Alpha
+fn update_planet_alpha_ui(
+    planet_state: Res<PlanetAlphaStateRes>,
+    mut cell_query: Query<&mut Text, With<PlanetAlphaCell>>,
+    mut rocket_query: Query<&mut Text, (With<PlanetAlphaRocket>, Without<PlanetAlphaCell>)>,
+) {
+    if planet_state.is_changed() {
+        // Update charged cell display
+        if let Ok(mut text) = cell_query.single_mut() {
+            text.0 = format!("{}/{}", planet_state.1, planet_state.0)
+        }
+
+        // Update rocket count
+        if let Ok(mut text) = rocket_query.single_mut() {
+            text.0 = planet_state.2.to_string();
+        }
+    }
+}
+
+// Update system for Planet Beta
+fn update_planet_beta_ui(
+    planet_state: Res<PlanetBetaStateRes>,
+    mut cell_query: Query<&mut Text, With<PlanetBetaCell>>,
+    mut rocket_query: Query<&mut Text, (With<PlanetBetaRocket>, Without<PlanetBetaCell>)>,
+) {
+    if planet_state.is_changed() {
+        // Update charged cell display
+        if let Ok(mut text) = cell_query.single_mut() {
+            text.0 = format!("{}/{}", planet_state.1, planet_state.0)
+        }
+
+        // Update rocket count
+        if let Ok(mut text) = rocket_query.single_mut() {
+            text.0 = planet_state.2.to_string();
+        }
+    }
 }
 
 #[derive(Component)]
@@ -135,7 +196,10 @@ impl Orchestrator {
 fn setup(
     mut commands: Commands,
     asset_server: Res<AssetServer>,
-    mut dialog_query: Query<&mut Visibility, With<LogText>>,
+    mut dialog_query: Query<
+        &mut Visibility,
+        Or<(With<LogText>, With<PlanetAlphaState>, With<PlanetBetaState>)>,
+    >,
 ) {
     let orchestrator = Orchestrator::new();
     let explorer_handl = ExplorerHandler::new();
@@ -152,7 +216,7 @@ fn setup(
         .spawn((
             Sprite {
                 image: asset_server.load("sprites/Terran.png"),
-                custom_size: Some(Vec2::new(80.0, 80.0)),
+                custom_size: Some(Vec2::new(100.0, 100.0)),
                 ..default()
             },
             Transform::from_xyz(-400.0, 0.0, 0.0),
@@ -172,7 +236,7 @@ fn setup(
         .spawn((
             Sprite {
                 image: asset_server.load("sprites/Ice.png"),
-                custom_size: Some(Vec2::new(80.0, 80.0)),
+                custom_size: Some(Vec2::new(100.0, 100.0)),
                 ..default()
             },
             Transform::from_xyz(400.0, 0.0, 0.0),
@@ -185,7 +249,7 @@ fn setup(
     commands.spawn((
         Sprite {
             image: asset_server.load("sprites/explorer.png"),
-            custom_size: Some(Vec2::new(30.0, 30.0)),
+            custom_size: Some(Vec2::new(50.0, 50.0)),
             ..default()
         },
         Transform::from_xyz(0.0, 0.0, 1.0),
@@ -223,7 +287,7 @@ fn setup(
         .expect("No message received")
     {
         PlanetToOrchestrator::StartPlanetAIResult { planet_id } => {
-            println!("Planet {planet_id} started")
+            info!("Planet {planet_id} started")
         }
         _other => panic!("Failed to start planet"),
     }
@@ -233,7 +297,50 @@ fn setup(
         .expect("No message received")
     {
         PlanetToOrchestrator::StartPlanetAIResult { planet_id } => {
-            println!("Planet {planet_id} started")
+            info!("Planet {planet_id} started")
+        }
+        _other => panic!("Failed to start planet"),
+    }
+
+    orchestrator
+        .orch_tx_p1
+        .send(OrchestratorToPlanet::InternalStateRequest)
+        .expect("Failed to send start messages");
+    orchestrator
+        .orch_tx_p2
+        .send(OrchestratorToPlanet::InternalStateRequest)
+        .expect("Failed to send start messages");
+    match orchestrator
+        .planet_rx_p1
+        .recv_timeout(std::time::Duration::from_millis(100))
+        .expect("No message received")
+    {
+        PlanetToOrchestrator::InternalStateResponse {
+            planet_id,
+            planet_state,
+        } => {
+            commands.insert_resource(PlanetAlphaStateRes(
+                planet_state.energy_cells.len(),
+                planet_state.charged_cells_count,
+                planet_state.has_rocket,
+            ));
+        }
+        _other => panic!("Failed to start planet"),
+    }
+    match orchestrator
+        .planet_rx_p2
+        .recv_timeout(std::time::Duration::from_millis(100))
+        .expect("No message received")
+    {
+        PlanetToOrchestrator::InternalStateResponse {
+            planet_id,
+            planet_state,
+        } => {
+            commands.insert_resource(PlanetBetaStateRes(
+                planet_state.energy_cells.len(),
+                planet_state.charged_cells_count,
+                planet_state.has_rocket,
+            ));
         }
         _other => panic!("Failed to start planet"),
     }
@@ -246,15 +353,60 @@ fn setup(
     }
 }
 
+fn check_status_changes(
+    mut planet_alpha_state: ResMut<PlanetAlphaStateRes>,
+    mut planet_beta_state: ResMut<PlanetBetaStateRes>,
+    orch: Res<Orchestrator>,
+) {
+    orch.orch_tx_p1
+        .send(OrchestratorToPlanet::InternalStateRequest)
+        .expect("Failed to send start messages");
+    orch.orch_tx_p2
+        .send(OrchestratorToPlanet::InternalStateRequest)
+        .expect("Failed to send start messages");
+    match orch
+        .planet_rx_p1
+        .recv_timeout(std::time::Duration::from_millis(100))
+        .expect("No message received")
+    {
+        PlanetToOrchestrator::InternalStateResponse {
+            planet_id,
+            planet_state,
+        } => {
+            planet_alpha_state.1 = planet_state.charged_cells_count;
+            planet_alpha_state.2 = planet_state.has_rocket;
+        }
+        _other => panic!("Failed to start planet"),
+    }
+    match orch
+        .planet_rx_p2
+        .recv_timeout(std::time::Duration::from_millis(100))
+        .expect("No message received")
+    {
+        PlanetToOrchestrator::InternalStateResponse {
+            planet_id,
+            planet_state,
+        } => {
+            planet_beta_state.1 = planet_state.charged_cells_count;
+            planet_beta_state.2 = planet_state.has_rocket;
+        }
+        _other => panic!("Failed to start planet"),
+    }
+}
+
 fn check_entities_and_end_game(
     mut commands: Commands,
     planet: Query<&Planet>,
+    explorer: Query<&Planet>,
     mut next_state: ResMut<NextState<GameState>>,
-    query: Query<Entity, With<Explorer>>,
+    query: Query<Entity, Or<(With<Explorer>, With<Planet>)>>,
     mut log_query: Query<&mut Text, With<LogText>>,
-    mut dialog_query: Query<&mut Visibility, With<LogText>>,
+    mut dialog_query: Query<
+        &mut Visibility,
+        Or<(With<LogText>, With<PlanetAlphaState>, With<PlanetBetaState>)>,
+    >,
 ) {
-    if planet.is_empty() {
+    if planet.is_empty() || explorer.is_empty() {
         for mut visibility in &mut dialog_query {
             *visibility = Visibility::Hidden;
         }
@@ -514,6 +666,136 @@ fn available_energy_cell_button_system(
                     text.0 = format!(
                         "\nPlanet Beta has {energy_cell} charged energy cell\n{}",
                         text.0
+                    );
+                }
+            }
+            info!("No button pressed");
+        }
+    }
+}
+
+fn generate_supported_resource_button_system(
+    explorer_query: Single<&Transform, With<Explorer>>,
+    interaction_query: Query<&Interaction, (Changed<Interaction>, With<ExtractResourceButton>)>,
+    mut log_query: Query<&mut Text, With<LogText>>,
+    expl: Res<ExplorerHandler>,
+) {
+    for interaction in &interaction_query {
+        if *interaction == Interaction::Pressed {
+            if explorer_query.translation.x < 0.0 {
+                let _ = expl
+                    .expl_tx_p1
+                    .send(ExplorerToPlanet::SupportedResourceRequest {
+                        explorer_id: expl.id,
+                    });
+                let res = expl
+                    .planet_rx
+                    .recv_timeout(std::time::Duration::from_millis(100));
+
+                let resource: Option<BasicResourceType> = match res {
+                    Ok(msg) => match msg {
+                        PlanetToExplorer::SupportedResourceResponse { resource_list } => {
+                            info!("From this planet you can generate: {:?}", resource_list);
+                            Some(*resource_list.iter().next().unwrap())
+                        }
+                        _other => {
+                            warn!("Wrong message received");
+                            None
+                        }
+                    },
+                    Err(_) => {
+                        warn!("Connection timed out");
+                        None
+                    }
+                };
+                let _ = expl
+                    .expl_tx_p1
+                    .send(ExplorerToPlanet::GenerateResourceRequest {
+                        explorer_id: expl.id,
+                        resource: resource.unwrap(),
+                    });
+                let res = expl
+                    .planet_rx
+                    .recv_timeout(std::time::Duration::from_millis(100));
+
+                let gen_resource: Option<BasicResource> = match res {
+                    Ok(msg) => match msg {
+                        PlanetToExplorer::GenerateResourceResponse { resource } => {
+                            info!("Generated: {:?}", resource);
+                            resource
+                        }
+                        _other => {
+                            warn!("Wrong message received");
+                            None
+                        }
+                    },
+                    Err(_) => {
+                        warn!("Connection timed out");
+                        None
+                    }
+                };
+                if let Ok(mut text) = log_query.single_mut() {
+                    text.0 = format!(
+                        "\nPlanet Alpha has generated: {:?}\n{}",
+                        gen_resource, text.0
+                    );
+                }
+            } else {
+                let _ = expl
+                    .expl_tx_p2
+                    .send(ExplorerToPlanet::SupportedResourceRequest {
+                        explorer_id: expl.id,
+                    });
+                let res = expl
+                    .planet_rx
+                    .recv_timeout(std::time::Duration::from_millis(100));
+
+                let resource: Option<BasicResourceType> = match res {
+                    Ok(msg) => match msg {
+                        PlanetToExplorer::SupportedResourceResponse { resource_list } => {
+                            info!("From this planet you can generate: {:?}", resource_list);
+                            Some(*resource_list.iter().next().unwrap())
+                        }
+                        _other => {
+                            warn!("Wrong message received");
+                            None
+                        }
+                    },
+                    Err(_) => {
+                        warn!("Connection timed out");
+                        None
+                    }
+                };
+                let _ = expl
+                    .expl_tx_p2
+                    .send(ExplorerToPlanet::GenerateResourceRequest {
+                        explorer_id: expl.id,
+                        resource: resource.unwrap(),
+                    });
+                let res = expl
+                    .planet_rx
+                    .recv_timeout(std::time::Duration::from_millis(100));
+
+                let gen_resource: Option<BasicResource> = match res {
+                    Ok(msg) => match msg {
+                        PlanetToExplorer::GenerateResourceResponse { resource } => {
+                            info!("Generated: {:?}", resource);
+                            resource
+                        }
+                        _other => {
+                            warn!("Wrong message received");
+                            None
+                        }
+                    },
+                    Err(_) => {
+                        warn!("Connection timed out");
+                        None
+                    }
+                };
+                if let Ok(mut text) = log_query.single_mut() {
+                    text.0 = format!(
+                        "\nPlanet Beta has generated: {:?}\n{}",
+                        gen_resource, text.0
                     );
                 }
             }

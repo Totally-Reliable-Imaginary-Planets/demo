@@ -35,6 +35,19 @@ pub struct LogScreen;
 pub struct LogText;
 
 #[derive(Component)]
+pub struct PlanetAlphaState;
+#[derive(Component)]
+pub struct PlanetAlphaCell;
+#[derive(Component)]
+pub struct PlanetAlphaRocket;
+#[derive(Component)]
+pub struct PlanetBetaState;
+#[derive(Component)]
+pub struct PlanetBetaCell;
+#[derive(Component)]
+pub struct PlanetBetaRocket;
+
+#[derive(Component)]
 struct PlanetDialog;
 #[derive(Component)]
 struct LandedPlanetDialog;
@@ -66,24 +79,40 @@ fn setup(mut commands: Commands) {
         Transform::from_xyz(0.0, 0.0, 1000.0),
     ));
 
+    let spacing = 20.0;
+    let padding = 12.0;
+
     // Planet states
     commands.spawn((
         Node {
             position_type: PositionType::Absolute,
             flex_direction: FlexDirection::Column,
-            top: Val::Px(0.0),
-            left: Val::Px(0.0),
+            top: Val::Px(spacing),
+            left: Val::Px(spacing),
+            padding: UiRect::all(Val::Px(padding)),
             width: Val::Percent(15.0),
+            max_width: Val::Percent(20.0),
             height: Val::Percent(30.0),
             ..default()
         },
+        PlanetAlphaState,
         Visibility::Visible,
         BackgroundColor(Color::BLACK.with_alpha(0.7)),
         children![
             (
                 Text::new("Planet Alpha"),
-                TextFont::default().with_font_size(16.0),
+                TextFont::default().with_font_size(18.0),
                 TextColor(Color::WHITE),
+            ),
+            (
+                Node {
+                    width: Val::Percent(100.0),
+                    height: Val::Px(2.0),
+                    top: Val::Px(2.0),
+                    bottom: Val::Px(2.0),
+                    ..default()
+                },
+                BackgroundColor(Color::srgba(0.5, 0.5, 0.5, 0.5).into(),),
             ),
             (
                 Text::new("Charged cell:"),
@@ -94,6 +123,7 @@ fn setup(mut commands: Commands) {
                 Text::new("..."),
                 TextFont::default().with_font_size(16.0),
                 TextColor(Color::WHITE),
+                PlanetAlphaCell,
             ),
             (
                 Text::new("Rocket:"),
@@ -104,6 +134,7 @@ fn setup(mut commands: Commands) {
                 Text::new("0"),
                 TextFont::default().with_font_size(16.0),
                 TextColor(Color::WHITE),
+                PlanetAlphaRocket
             )
         ],
     ));
@@ -112,19 +143,32 @@ fn setup(mut commands: Commands) {
         Node {
             position_type: PositionType::Absolute,
             flex_direction: FlexDirection::Column,
-            top: Val::Px(0.0),
-            right: Val::Px(0.0),
+            top: Val::Px(spacing),
+            right: Val::Px(spacing),
+            padding: UiRect::all(Val::Px(padding)),
             width: Val::Percent(15.0),
+            max_width: Val::Percent(20.0),
             height: Val::Percent(30.0),
             ..default()
         },
+        PlanetBetaState,
         Visibility::Visible,
         BackgroundColor(Color::BLACK.with_alpha(0.7)),
         children![
             (
                 Text::new("Planet Beta"),
-                TextFont::default().with_font_size(16.0),
+                TextFont::default().with_font_size(18.0),
                 TextColor(Color::WHITE),
+            ),
+            (
+                Node {
+                    width: Val::Percent(100.0),
+                    height: Val::Px(2.0),
+                    top: Val::Px(2.0),
+                    bottom: Val::Px(2.0),
+                    ..default()
+                },
+                BackgroundColor(Color::srgba(0.5, 0.5, 0.5, 0.5).into(),),
             ),
             (
                 Text::new("Charged cell:"),
@@ -135,6 +179,7 @@ fn setup(mut commands: Commands) {
                 Text::new("..."),
                 TextFont::default().with_font_size(16.0),
                 TextColor(Color::WHITE),
+                PlanetBetaCell
             ),
             (
                 Text::new("Rocket:"),
@@ -145,6 +190,7 @@ fn setup(mut commands: Commands) {
                 Text::new("0"),
                 TextFont::default().with_font_size(16.0),
                 TextColor(Color::WHITE),
+                PlanetBetaRocket,
             )
         ],
     ));
