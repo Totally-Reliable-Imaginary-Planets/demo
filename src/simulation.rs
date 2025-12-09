@@ -1,4 +1,5 @@
 use bevy::prelude::*;
+use common_game::components::resource::BasicResourceType;
 use common_game::protocols::messages::*;
 use crossbeam_channel::*;
 
@@ -9,11 +10,13 @@ use crate::planet::Planet;
 use crate::resources::EventSpawnTimer;
 use crate::resources::PlanetEntities;
 
+use crate::AvailableEnergyCellButton;
 use crate::GameState;
 use crate::LandedPlanetDialog;
 use crate::LogText;
 use crate::NoButton;
 use crate::PlanetDialog;
+use crate::SupportedResourceButton;
 use crate::TakeOffPlanetButton;
 use crate::YesButton;
 
@@ -33,6 +36,8 @@ pub fn simulation_plugin(app: &mut App) {
                 yes_button_system,
                 no_button_system,
                 take_off_button_system,
+                supported_resource_button_system,
+                available_energy_cell_button_system,
             )
                 .run_if(in_state(GameState::Playing)),
         );
@@ -47,15 +52,25 @@ struct PlanetBeta;
 pub struct ExplorerHandler {
     pub planet_tx: Sender<PlanetToExplorer>,
     pub planet_rx: Receiver<PlanetToExplorer>,
+    pub expl_tx_p1: Sender<ExplorerToPlanet>,
+    pub expl_rx_p1: Receiver<ExplorerToPlanet>,
+    pub expl_tx_p2: Sender<ExplorerToPlanet>,
+    pub expl_rx_p2: Receiver<ExplorerToPlanet>,
     pub id: u32,
 }
 
 impl ExplorerHandler {
     pub fn new() -> Self {
         let (planet_tx, planet_rx) = unbounded();
+        let (expl_tx_p1, expl_rx_p1) = unbounded();
+        let (expl_tx_p2, expl_rx_p2) = unbounded();
         Self {
             planet_tx,
             planet_rx,
+            expl_tx_p1,
+            expl_rx_p1,
+            expl_tx_p2,
+            expl_rx_p2,
             id: 0,
         }
     }
@@ -71,8 +86,6 @@ pub struct Orchestrator {
     pub planet_rx_p1: Receiver<PlanetToOrchestrator>,
     pub planet_tx_p2: Sender<PlanetToOrchestrator>,
     pub planet_rx_p2: Receiver<PlanetToOrchestrator>,
-    pub expl_tx: Sender<ExplorerToPlanet>,
-    pub expl_rx: Receiver<ExplorerToPlanet>,
 }
 
 impl Orchestrator {
@@ -81,7 +94,6 @@ impl Orchestrator {
         let (planet_tx_p1, planet_rx_p1) = unbounded();
         let (orch_tx_p2, orch_rx_p2) = unbounded();
         let (planet_tx_p2, planet_rx_p2) = unbounded();
-        let (expl_tx, expl_rx) = unbounded();
 
         Self {
             orch_tx_p1,
@@ -92,8 +104,6 @@ impl Orchestrator {
             planet_rx_p1,
             planet_tx_p2,
             planet_rx_p2,
-            expl_tx,
-            expl_rx,
         }
     }
 
@@ -120,14 +130,6 @@ impl Orchestrator {
         }
         self.orch_tx_p2.send(msg)
     }
-
-    // Send explorer data
-    pub fn send_explorer_data(
-        &self,
-        msg: ExplorerToPlanet,
-    ) -> Result<(), SendError<ExplorerToPlanet>> {
-        self.expl_tx.send(msg)
-    }
 }
 
 fn setup(
@@ -143,7 +145,7 @@ fn setup(
         0,
         orchestrator.orch_rx_p1.clone(),
         orchestrator.planet_tx_p1.clone(),
-        orchestrator.expl_rx.clone(),
+        explorer_handl.expl_rx_p1.clone(),
     )
     .expect("Error createing planet1");
     let planet1 = commands
@@ -163,7 +165,7 @@ fn setup(
         1,
         orchestrator.orch_rx_p2.clone(),
         orchestrator.planet_tx_p2.clone(),
-        orchestrator.expl_rx.clone(),
+        explorer_handl.expl_rx_p2.clone(),
     )
     .expect("Error createing planet2");
     let planet2 = commands
@@ -201,10 +203,10 @@ fn setup(
     });
 
     std::thread::spawn(move || {
-        p1.run();
+        let _ = p1.run();
     });
     std::thread::spawn(move || {
-        p2.run();
+        let _ = p2.run();
     });
 
     orchestrator
@@ -303,16 +305,17 @@ fn yes_button_system(
 
             // Determine target planet
             let target_planet = if explorer_query.translation.x < 0.0 {
-                orch.broadcast(
+                let _ = orch.broadcast(
                     OrchestratorToPlanet::IncomingExplorerRequest {
                         explorer_id: expl.id,
                         new_mpsc_sender: expl.planet_tx.clone(),
                     },
                     0,
                 );
-                let res = orch.planet_rx_p1
+                let res = orch
+                    .planet_rx_p1
                     .recv_timeout(std::time::Duration::from_millis(100));
-                
+
                 match res {
                     Ok(msg) => match msg {
                         PlanetToOrchestrator::IncomingExplorerResponse {
@@ -331,22 +334,44 @@ fn yes_button_system(
                         }
                         _other => warn!("Wrong message received"),
                     },
-                    Err(e) => warn!("Connection timed out"),
+                    Err(_) => warn!("Connection timed out"),
                 }
                 if let Ok(mut text) = log_query.single_mut() {
                     text.0 = format!("Explorer Landed on planet Alpha\n{}", text.0);
                 }
                 planet_alpha_entity.single().unwrap()
             } else {
-                orch.broadcast(
+                let _ = orch.broadcast(
                     OrchestratorToPlanet::IncomingExplorerRequest {
                         explorer_id: expl.id,
                         new_mpsc_sender: expl.planet_tx.clone(),
                     },
                     1,
                 );
-                orch.planet_rx_p2
+                let res = orch
+                    .planet_rx_p2
                     .recv_timeout(std::time::Duration::from_millis(100));
+
+                match res {
+                    Ok(msg) => match msg {
+                        PlanetToOrchestrator::IncomingExplorerResponse {
+                            planet_id,
+                            res: Ok(()),
+                        } => {
+                            info!("Explorer successfully landed on planet {planet_id}");
+                        }
+                        PlanetToOrchestrator::OutgoingExplorerResponse {
+                            planet_id,
+                            res: Err(e),
+                        } => {
+                            warn!(
+                                "An error: {e} occurred while the explorer was landing on planet {planet_id}"
+                            );
+                        }
+                        _other => warn!("Wrong message received"),
+                    },
+                    Err(_) => warn!("Connection timed out"),
+                }
                 if let Ok(mut text) = log_query.single_mut() {
                     text.0 = format!("Explorer Landed on planet Beta\n{}", text.0);
                 }
@@ -358,11 +383,11 @@ fn yes_button_system(
             });
             let planet_alpha_x = match planet_alpha.single() {
                 Ok(t) => t.translation.x,
-                Err(e) => 300.0,
+                Err(_) => -300.0,
             };
             let planet_beta_x = match planet_beta.single() {
                 Ok(t) => t.translation.x,
-                Err(e) => 300.0,
+                Err(_) => 300.0,
             };
             handle_button_press(
                 &mut explorer_query,
@@ -385,11 +410,11 @@ fn no_button_system(
         if *interaction == Interaction::Pressed {
             let planet_alpha_x = match planet_alpha.single() {
                 Ok(t) => t.translation.x,
-                Err(e) => -300.0,
+                Err(_) => -300.0,
             };
             let planet_beta_x = match planet_beta.single() {
                 Ok(t) => t.translation.x,
-                Err(e) => 300.0,
+                Err(_) => 300.0,
             };
             handle_button_press(
                 &mut explorer_query,
@@ -419,6 +444,156 @@ fn handle_button_press(
     }
 }
 
+fn available_energy_cell_button_system(
+    explorer_query: Single<&Transform, With<Explorer>>,
+    interaction_query: Query<&Interaction, (Changed<Interaction>, With<AvailableEnergyCellButton>)>,
+    mut log_query: Query<&mut Text, With<LogText>>,
+    expl: Res<ExplorerHandler>,
+) {
+    for interaction in &interaction_query {
+        if *interaction == Interaction::Pressed {
+            if explorer_query.translation.x < 0.0 {
+                let _ = expl
+                    .expl_tx_p1
+                    .send(ExplorerToPlanet::AvailableEnergyCellRequest {
+                        explorer_id: expl.id,
+                    });
+                let res = expl
+                    .planet_rx
+                    .recv_timeout(std::time::Duration::from_millis(100));
+
+                let energy_cell: u32 = match res {
+                    Ok(msg) => match msg {
+                        PlanetToExplorer::AvailableEnergyCellResponse { available_cells } => {
+                            info!("This planet now has {available_cells} charged energy cell");
+                            available_cells
+                        }
+                        _other => {
+                            warn!("Wrong message received");
+                            0
+                        }
+                    },
+                    Err(_) => {
+                        warn!("Connection timed out");
+                        0
+                    }
+                };
+                if let Ok(mut text) = log_query.single_mut() {
+                    text.0 = format!(
+                        "\nPlanet Alpha has {energy_cell} charged energy cell\n{}",
+                        text.0
+                    );
+                }
+            } else {
+                let _ = expl
+                    .expl_tx_p2
+                    .send(ExplorerToPlanet::AvailableEnergyCellRequest {
+                        explorer_id: expl.id,
+                    });
+                let res = expl
+                    .planet_rx
+                    .recv_timeout(std::time::Duration::from_millis(100));
+
+                let energy_cell: u32 = match res {
+                    Ok(msg) => match msg {
+                        PlanetToExplorer::AvailableEnergyCellResponse { available_cells } => {
+                            info!("This planet now has {available_cells} charged energy cell");
+                            available_cells
+                        }
+                        _other => {
+                            warn!("Wrong message received");
+                            0
+                        }
+                    },
+                    Err(_) => {
+                        warn!("Connection timed out");
+                        0
+                    }
+                };
+                if let Ok(mut text) = log_query.single_mut() {
+                    text.0 = format!(
+                        "\nPlanet Beta has {energy_cell} charged energy cell\n{}",
+                        text.0
+                    );
+                }
+            }
+            info!("No button pressed");
+        }
+    }
+}
+
+fn supported_resource_button_system(
+    explorer_query: Single<&Transform, With<Explorer>>,
+    interaction_query: Query<&Interaction, (Changed<Interaction>, With<SupportedResourceButton>)>,
+    mut log_query: Query<&mut Text, With<LogText>>,
+    expl: Res<ExplorerHandler>,
+) {
+    for interaction in &interaction_query {
+        if *interaction == Interaction::Pressed {
+            if explorer_query.translation.x < 0.0 {
+                let _ = expl
+                    .expl_tx_p1
+                    .send(ExplorerToPlanet::SupportedResourceRequest {
+                        explorer_id: expl.id,
+                    });
+                let res = expl
+                    .planet_rx
+                    .recv_timeout(std::time::Duration::from_millis(100));
+
+                let resource: Option<BasicResourceType> = match res {
+                    Ok(msg) => match msg {
+                        PlanetToExplorer::SupportedResourceResponse { resource_list } => {
+                            info!("From this planet you can generate: {:?}", resource_list);
+                            Some(*resource_list.iter().next().unwrap())
+                        }
+                        _other => {
+                            warn!("Wrong message received");
+                            None
+                        }
+                    },
+                    Err(_) => {
+                        warn!("Connection timed out");
+                        None
+                    }
+                };
+                if let Ok(mut text) = log_query.single_mut() {
+                    text.0 = format!("\nPlanet Alpha can generate: {:?}\n{}", resource, text.0);
+                }
+            } else {
+                let _ = expl
+                    .expl_tx_p2
+                    .send(ExplorerToPlanet::SupportedResourceRequest {
+                        explorer_id: expl.id,
+                    });
+                let res = expl
+                    .planet_rx
+                    .recv_timeout(std::time::Duration::from_millis(100));
+
+                let resource: Option<BasicResourceType> = match res {
+                    Ok(msg) => match msg {
+                        PlanetToExplorer::SupportedResourceResponse { resource_list } => {
+                            info!("From this planet you can generate: {:?}", resource_list);
+                            Some(*resource_list.iter().next().unwrap())
+                        }
+                        _other => {
+                            warn!("Wrong message received");
+                            None
+                        }
+                    },
+                    Err(_) => {
+                        warn!("Connection timed out");
+                        None
+                    }
+                };
+                if let Ok(mut text) = log_query.single_mut() {
+                    text.0 = format!("\nPlanet Beta can generate: {:?}\n{}", resource, text.0);
+                }
+            }
+            info!("No button pressed");
+        }
+    }
+}
+
 fn take_off_button_system(
     mut commands: Commands,
     explorer: Single<Entity, With<Landed>>,
@@ -433,15 +608,16 @@ fn take_off_button_system(
             commands.entity(*explorer).remove::<Landed>();
             commands.entity(*explorer).insert(Roaming);
             explorer_query.translation.x = if explorer_query.translation.x < 0.0 {
-                orch.broadcast(
+                let _ = orch.broadcast(
                     OrchestratorToPlanet::OutgoingExplorerRequest {
                         explorer_id: expl.id,
                     },
                     0,
                 );
-                let res = orch.planet_rx_p1
+                let res = orch
+                    .planet_rx_p1
                     .recv_timeout(std::time::Duration::from_millis(100));
-                
+
                 match res {
                     Ok(msg) => match msg {
                         PlanetToOrchestrator::OutgoingExplorerResponse {
@@ -460,14 +636,14 @@ fn take_off_button_system(
                         }
                         _other => warn!("Wrong message received"),
                     },
-                    Err(e) => warn!("Connection timed out"),
+                    Err(_) => warn!("Connection timed out"),
                 }
                 if let Ok(mut text) = log_query.single_mut() {
-                    text.0 = format!("Explorer take off from planet Alpha\n{}", text.0);
+                    text.0 = format!("\nExplorer take off from planet Alpha\n{}", text.0);
                 }
                 explorer_query.translation.x + 70.0
             } else {
-                orch.broadcast(
+                let _ = orch.broadcast(
                     OrchestratorToPlanet::OutgoingExplorerRequest {
                         explorer_id: expl.id,
                     },
@@ -494,10 +670,10 @@ fn take_off_button_system(
                         }
                         _other => warn!("Wrong message received"),
                     },
-                    Err(e) => warn!("Connection timed out"),
+                    Err(_) => warn!("Connection timed out"),
                 }
                 if let Ok(mut text) = log_query.single_mut() {
-                    text.0 = format!("Explorer take off from planet Beta\n{}", text.0);
+                    text.0 = format!("\nExplorer take off from planet Beta\n{}", text.0);
                 }
                 explorer_query.translation.x - 70.0
             };

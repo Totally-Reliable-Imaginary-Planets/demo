@@ -58,12 +58,95 @@ struct AvailableEnergyCellButton;
 #[derive(Component)]
 struct TakeOffPlanetButton;
 
-fn setup(mut commands: Commands, asset_server: Res<AssetServer>) {
+fn setup(mut commands: Commands) {
     // Camera
     commands.spawn((
         Camera2d,
         Camera::default(),
         Transform::from_xyz(0.0, 0.0, 1000.0),
+    ));
+
+    // Planet states
+    commands.spawn((
+        Node {
+            position_type: PositionType::Absolute,
+            flex_direction: FlexDirection::Column,
+            top: Val::Px(0.0),
+            left: Val::Px(0.0),
+            width: Val::Percent(15.0),
+            height: Val::Percent(30.0),
+            ..default()
+        },
+        Visibility::Visible,
+        BackgroundColor(Color::BLACK.with_alpha(0.7)),
+        children![
+            (
+                Text::new("Planet Alpha"),
+                TextFont::default().with_font_size(16.0),
+                TextColor(Color::WHITE),
+            ),
+            (
+                Text::new("Charged cell:"),
+                TextFont::default().with_font_size(16.0),
+                TextColor(Color::WHITE),
+            ),
+            (
+                Text::new("..."),
+                TextFont::default().with_font_size(16.0),
+                TextColor(Color::WHITE),
+            ),
+            (
+                Text::new("Rocket:"),
+                TextFont::default().with_font_size(16.0),
+                TextColor(Color::WHITE),
+            ),
+            (
+                Text::new("0"),
+                TextFont::default().with_font_size(16.0),
+                TextColor(Color::WHITE),
+            )
+        ],
+    ));
+
+    commands.spawn((
+        Node {
+            position_type: PositionType::Absolute,
+            flex_direction: FlexDirection::Column,
+            top: Val::Px(0.0),
+            right: Val::Px(0.0),
+            width: Val::Percent(15.0),
+            height: Val::Percent(30.0),
+            ..default()
+        },
+        Visibility::Visible,
+        BackgroundColor(Color::BLACK.with_alpha(0.7)),
+        children![
+            (
+                Text::new("Planet Beta"),
+                TextFont::default().with_font_size(16.0),
+                TextColor(Color::WHITE),
+            ),
+            (
+                Text::new("Charged cell:"),
+                TextFont::default().with_font_size(16.0),
+                TextColor(Color::WHITE),
+            ),
+            (
+                Text::new("..."),
+                TextFont::default().with_font_size(16.0),
+                TextColor(Color::WHITE),
+            ),
+            (
+                Text::new("Rocket:"),
+                TextFont::default().with_font_size(16.0),
+                TextColor(Color::WHITE),
+            ),
+            (
+                Text::new("0"),
+                TextFont::default().with_font_size(16.0),
+                TextColor(Color::WHITE),
+            )
+        ],
     ));
 
     // Log screen

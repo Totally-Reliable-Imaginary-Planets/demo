@@ -59,11 +59,13 @@ pub fn event_spawner_system(
                     }
                     1 => {
                         let res = if planet.name() == "Alpha" {
-                            orch.broadcast(OrchestratorToPlanet::Asteroid(Asteroid::default()), 0);
+                            let _ = orch
+                                .broadcast(OrchestratorToPlanet::Asteroid(Asteroid::default()), 0);
                             orch.planet_rx_p1
                                 .recv_timeout(std::time::Duration::from_millis(100))
                         } else {
-                            orch.broadcast(OrchestratorToPlanet::Asteroid(Asteroid::default()), 1);
+                            let _ = orch
+                                .broadcast(OrchestratorToPlanet::Asteroid(Asteroid::default()), 1);
                             orch.planet_rx_p2
                                 .recv_timeout(std::time::Duration::from_millis(100))
                         };
@@ -102,7 +104,7 @@ pub fn event_spawner_system(
 
                 // Update UI text instead of printing
                 if let Ok(mut text) = log_query.single_mut() {
-                    text.0 = format!("{}\n{}", log_message, text.0);
+                    text.0 = format!("\n{}\n{}", log_message, text.0);
                 }
             }
         }
@@ -163,11 +165,11 @@ pub fn event_handler_system(
             let log_message = match event {
                 GalaxyEvent::Sunray => {
                     let res = if planet.name() == "Alpha" {
-                        orch.broadcast(OrchestratorToPlanet::Sunray(Sunray::default()), 0);
+                        let _ = orch.broadcast(OrchestratorToPlanet::Sunray(Sunray::default()), 0);
                         orch.planet_rx_p1
                             .recv_timeout(std::time::Duration::from_millis(100))
                     } else {
-                        orch.broadcast(OrchestratorToPlanet::Sunray(Sunray::default()), 1);
+                        let _ = orch.broadcast(OrchestratorToPlanet::Sunray(Sunray::default()), 1);
                         orch.planet_rx_p2
                             .recv_timeout(std::time::Duration::from_millis(100))
                     };
@@ -191,7 +193,7 @@ pub fn event_handler_system(
 
             // Update UI text instead of printing
             if let Ok(mut text) = log_query.single_mut() {
-                text.0 = format!("{}\n{}", log_message, text.0);
+                text.0 = format!("\n{}\n{}", log_message, text.0);
             }
         }
     }
