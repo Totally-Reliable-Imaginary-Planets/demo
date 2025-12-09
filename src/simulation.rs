@@ -44,6 +44,24 @@ struct PlanetAlpha;
 struct PlanetBeta;
 
 #[derive(Resource)]
+pub struct ExplorerHandler {
+    pub planet_tx: Sender<PlanetToExplorer>,
+    pub planet_rx: Receiver<PlanetToExplorer>,
+    pub id: u32,
+}
+
+impl ExplorerHandler {
+    pub fn new() -> Self {
+        let (planet_tx, planet_rx) = unbounded();
+        Self {
+            planet_tx,
+            planet_rx,
+            id: 0,
+        }
+    }
+}
+
+#[derive(Resource)]
 pub struct Orchestrator {
     pub orch_tx_p1: Sender<OrchestratorToPlanet>,
     pub orch_rx_p1: Receiver<OrchestratorToPlanet>,
@@ -112,8 +130,13 @@ impl Orchestrator {
     }
 }
 
-fn setup(mut commands: Commands, mut dialog_query: Query<&mut Visibility, With<LogText>>) {
+fn setup(
+    mut commands: Commands,
+    asset_server: Res<AssetServer>,
+    mut dialog_query: Query<&mut Visibility, With<LogText>>,
+) {
     let orchestrator = Orchestrator::new();
+    let explorer_handl = ExplorerHandler::new();
 
     // Planets
     let mut p1 = trip::trip(
@@ -126,7 +149,7 @@ fn setup(mut commands: Commands, mut dialog_query: Query<&mut Visibility, With<L
     let planet1 = commands
         .spawn((
             Sprite {
-                color: Color::srgb(0.3, 0.5, 0.8),
+                image: asset_server.load("sprites/Terran.png"),
                 custom_size: Some(Vec2::new(80.0, 80.0)),
                 ..default()
             },
@@ -146,7 +169,7 @@ fn setup(mut commands: Commands, mut dialog_query: Query<&mut Visibility, With<L
     let planet2 = commands
         .spawn((
             Sprite {
-                color: Color::srgb(0.8, 0.3, 0.3),
+                image: asset_server.load("sprites/Ice.png"),
                 custom_size: Some(Vec2::new(80.0, 80.0)),
                 ..default()
             },
@@ -159,7 +182,7 @@ fn setup(mut commands: Commands, mut dialog_query: Query<&mut Visibility, With<L
     // Explorer
     commands.spawn((
         Sprite {
-            color: Color::srgb(0.9, 0.9, 0.1),
+            image: asset_server.load("sprites/explorer.png"),
             custom_size: Some(Vec2::new(30.0, 30.0)),
             ..default()
         },
@@ -214,6 +237,7 @@ fn setup(mut commands: Commands, mut dialog_query: Query<&mut Visibility, With<L
     }
 
     commands.insert_resource(orchestrator);
+    commands.insert_resource(explorer_handl);
 
     for mut visibility in &mut dialog_query {
         *visibility = Visibility::Visible;
@@ -264,11 +288,14 @@ fn yes_button_system(
     interaction_query: Query<&Interaction, (Changed<Interaction>, With<YesButton>)>,
     explorer: Single<Entity, With<Roaming>>,
     mut explorer_query: Single<&mut Transform, With<Explorer>>,
-    planet_alpha_entity: Single<Entity, With<PlanetAlpha>>,
-    planet_beta_entity: Single<Entity, With<PlanetBeta>>,
-    planet_alpha: Single<&Transform, (With<PlanetAlpha>, Without<Explorer>)>,
-    planet_beta: Single<&Transform, (With<PlanetBeta>, Without<Explorer>)>,
+    planet_alpha_entity: Query<Entity, With<PlanetAlpha>>,
+    planet_beta_entity: Query<Entity, With<PlanetBeta>>,
+    planet_alpha: Query<&Transform, (With<PlanetAlpha>, Without<Explorer>)>,
+    planet_beta: Query<&Transform, (With<PlanetBeta>, Without<Explorer>)>,
     mut dialog_query: Query<&mut Visibility, With<PlanetDialog>>,
+    mut log_query: Query<&mut Text, With<LogText>>,
+    orch: Res<Orchestrator>,
+    expl: Res<ExplorerHandler>,
 ) {
     for interaction in &interaction_query {
         if *interaction == Interaction::Pressed {
@@ -276,19 +303,72 @@ fn yes_button_system(
 
             // Determine target planet
             let target_planet = if explorer_query.translation.x < 0.0 {
-                *planet_alpha_entity
+                orch.broadcast(
+                    OrchestratorToPlanet::IncomingExplorerRequest {
+                        explorer_id: expl.id,
+                        new_mpsc_sender: expl.planet_tx.clone(),
+                    },
+                    0,
+                );
+                let res = orch.planet_rx_p1
+                    .recv_timeout(std::time::Duration::from_millis(100));
+                
+                match res {
+                    Ok(msg) => match msg {
+                        PlanetToOrchestrator::IncomingExplorerResponse {
+                            planet_id,
+                            res: Ok(()),
+                        } => {
+                            info!("Explorer successfully landed on planet {planet_id}");
+                        }
+                        PlanetToOrchestrator::OutgoingExplorerResponse {
+                            planet_id,
+                            res: Err(e),
+                        } => {
+                            warn!(
+                                "An error: {e} occurred while the explorer was landing on planet {planet_id}"
+                            );
+                        }
+                        _other => warn!("Wrong message received"),
+                    },
+                    Err(e) => warn!("Connection timed out"),
+                }
+                if let Ok(mut text) = log_query.single_mut() {
+                    text.0 = format!("Explorer Landed on planet Alpha\n{}", text.0);
+                }
+                planet_alpha_entity.single().unwrap()
             } else {
-                *planet_beta_entity
+                orch.broadcast(
+                    OrchestratorToPlanet::IncomingExplorerRequest {
+                        explorer_id: expl.id,
+                        new_mpsc_sender: expl.planet_tx.clone(),
+                    },
+                    1,
+                );
+                orch.planet_rx_p2
+                    .recv_timeout(std::time::Duration::from_millis(100));
+                if let Ok(mut text) = log_query.single_mut() {
+                    text.0 = format!("Explorer Landed on planet Beta\n{}", text.0);
+                }
+                planet_beta_entity.single().unwrap()
             };
             commands.entity(explorer_entity).remove::<Roaming>();
             commands.entity(explorer_entity).insert(Landed {
                 planet: target_planet,
             });
+            let planet_alpha_x = match planet_alpha.single() {
+                Ok(t) => t.translation.x,
+                Err(e) => 300.0,
+            };
+            let planet_beta_x = match planet_beta.single() {
+                Ok(t) => t.translation.x,
+                Err(e) => 300.0,
+            };
             handle_button_press(
                 &mut explorer_query,
                 &mut dialog_query,
-                planet_alpha.translation.x,
-                planet_beta.translation.x,
+                planet_alpha_x,
+                planet_beta_x,
             );
             info!("Yes button pressed");
         }
@@ -297,17 +377,25 @@ fn yes_button_system(
 fn no_button_system(
     interaction_query: Query<&Interaction, (Changed<Interaction>, With<NoButton>)>,
     mut explorer_query: Single<&mut Transform, With<Explorer>>,
-    planet_alpha: Single<&Transform, (With<PlanetAlpha>, Without<Explorer>)>,
-    planet_beta: Single<&Transform, (With<PlanetBeta>, Without<Explorer>)>,
+    planet_alpha: Query<&Transform, (With<PlanetAlpha>, Without<Explorer>)>,
+    planet_beta: Query<&Transform, (With<PlanetBeta>, Without<Explorer>)>,
     mut dialog_query: Query<&mut Visibility, With<PlanetDialog>>,
 ) {
     for interaction in &interaction_query {
         if *interaction == Interaction::Pressed {
+            let planet_alpha_x = match planet_alpha.single() {
+                Ok(t) => t.translation.x,
+                Err(e) => -300.0,
+            };
+            let planet_beta_x = match planet_beta.single() {
+                Ok(t) => t.translation.x,
+                Err(e) => 300.0,
+            };
             handle_button_press(
                 &mut explorer_query,
                 &mut dialog_query,
-                planet_alpha.translation.x + 70.0,
-                planet_beta.translation.x - 70.0,
+                planet_alpha_x + 70.0,
+                planet_beta_x - 70.0,
             );
             info!("No button pressed");
         }
@@ -336,14 +424,81 @@ fn take_off_button_system(
     explorer: Single<Entity, With<Landed>>,
     mut explorer_query: Single<&mut Transform, With<Explorer>>,
     interaction_query: Query<&Interaction, (Changed<Interaction>, With<TakeOffPlanetButton>)>,
+    mut log_query: Query<&mut Text, With<LogText>>,
+    orch: Res<Orchestrator>,
+    expl: Res<ExplorerHandler>,
 ) {
     for interaction in &interaction_query {
         if *interaction == Interaction::Pressed {
             commands.entity(*explorer).remove::<Landed>();
             commands.entity(*explorer).insert(Roaming);
             explorer_query.translation.x = if explorer_query.translation.x < 0.0 {
+                orch.broadcast(
+                    OrchestratorToPlanet::OutgoingExplorerRequest {
+                        explorer_id: expl.id,
+                    },
+                    0,
+                );
+                let res = orch.planet_rx_p1
+                    .recv_timeout(std::time::Duration::from_millis(100));
+                
+                match res {
+                    Ok(msg) => match msg {
+                        PlanetToOrchestrator::OutgoingExplorerResponse {
+                            planet_id,
+                            res: Ok(()),
+                        } => {
+                            info!("Explorer successfully take off from planet {planet_id}");
+                        }
+                        PlanetToOrchestrator::OutgoingExplorerResponse {
+                            planet_id,
+                            res: Err(e),
+                        } => {
+                            warn!(
+                                "An error: {e} occurred while the explorer take off from planet {planet_id}"
+                            );
+                        }
+                        _other => warn!("Wrong message received"),
+                    },
+                    Err(e) => warn!("Connection timed out"),
+                }
+                if let Ok(mut text) = log_query.single_mut() {
+                    text.0 = format!("Explorer take off from planet Alpha\n{}", text.0);
+                }
                 explorer_query.translation.x + 70.0
             } else {
+                orch.broadcast(
+                    OrchestratorToPlanet::OutgoingExplorerRequest {
+                        explorer_id: expl.id,
+                    },
+                    1,
+                );
+                let res = orch
+                    .planet_rx_p2
+                    .recv_timeout(std::time::Duration::from_millis(100));
+                match res {
+                    Ok(msg) => match msg {
+                        PlanetToOrchestrator::OutgoingExplorerResponse {
+                            planet_id,
+                            res: Ok(()),
+                        } => {
+                            info!("Explorer successfully take off from planet {planet_id}");
+                        }
+                        PlanetToOrchestrator::OutgoingExplorerResponse {
+                            planet_id,
+                            res: Err(e),
+                        } => {
+                            warn!(
+                                "An error: {e} occurred while the explorer take off from planet {planet_id}"
+                            );
+                        }
+                        _other => warn!("Wrong message received"),
+                    },
+                    Err(e) => warn!("Connection timed out"),
+                }
+                if let Ok(mut text) = log_query.single_mut() {
+                    text.0 = format!("Explorer take off from planet Beta\n{}", text.0);
+                }
                 explorer_query.translation.x - 70.0
             };
             info!("No button pressed");

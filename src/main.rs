@@ -58,7 +58,7 @@ struct AvailableEnergyCellButton;
 #[derive(Component)]
 struct TakeOffPlanetButton;
 
-fn setup(mut commands: Commands) {
+fn setup(mut commands: Commands, asset_server: Res<AssetServer>) {
     // Camera
     commands.spawn((
         Camera2d,
