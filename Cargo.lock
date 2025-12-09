@@ -1752,6 +1752,17 @@ dependencies = [
 ]
 
 [[package]]
+name = "common-game"
+version = "1.0.0"
+source = "git+ssh://git@uni.github.com/unitn-ap-2025/common.git?branch=main#057049b785e5c6e6ad3cd3967b6ff44b5989769c"
+dependencies = [
+ "crossbeam-channel",
+ "lazy_static",
+ "log",
+ "paste",
+]
+
+[[package]]
 name = "concurrent-queue"
 version = "2.5.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2022,7 +2033,10 @@ name = "demo"
 version = "0.1.0"
 dependencies = [
  "bevy",
+ "common-game",
+ "crossbeam-channel",
  "rand",
+ "trip",
 ]
 
 [[package]]
@@ -4441,6 +4455,15 @@ dependencies = [
  "tracing",
  "tracing-subscriber",
  "wasm-bindgen",
+]
+
+[[package]]
+name = "trip"
+version = "0.4.0"
+source = "git+ssh://git@uni.github.com/Totally-Reliable-Imaginary-Planets/TRIP.git?branch=main#5212ca405bb201e69f8b7e8bcc0d485c2b82df62"
+dependencies = [
+ "common-game",
+ "crossbeam-channel",
 ]
 
 [[package]]

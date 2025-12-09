@@ -1,21 +1,9 @@
-use bevy::prelude::Alpha;
-use bevy::prelude::Color;
-use bevy::prelude::Commands;
-use bevy::prelude::Component;
-use bevy::prelude::Entity;
-use bevy::prelude::Query;
-use bevy::prelude::Res;
-use bevy::prelude::ResMut;
-use bevy::prelude::Sprite;
-use bevy::prelude::Text;
-use bevy::prelude::Time;
-use bevy::prelude::Timer;
-use bevy::prelude::TimerMode;
-use bevy::prelude::Transform;
-use bevy::prelude::Vec2;
-use bevy::prelude::With;
-use bevy::prelude::Without;
-use bevy::prelude::default;
+use crate::simulation::Orchestrator;
+use bevy::prelude::*;
+use common_game::components::asteroid::Asteroid;
+use common_game::components::sunray::Sunray;
+use common_game::protocols::messages::OrchestratorToPlanet;
+use common_game::protocols::messages::PlanetToOrchestrator;
 use rand::Rng;
 
 use crate::EventSpawnTimer;
@@ -46,6 +34,7 @@ pub fn event_spawner_system(
     existing_events: Query<&EventTarget>,
     planet_query: Query<&Planet>,
     mut log_query: Query<&mut Text, With<LogText>>,
+    orch: Res<Orchestrator>,
 ) {
     if timer.0.tick(time.delta()).just_finished() {
         // Don't spawn if there's already an active event
@@ -69,14 +58,44 @@ pub fn event_spawner_system(
                         format!("☀️ Sunray approaching planet {}!", planet.name())
                     }
                     1 => {
-                        commands.spawn((
-                            GalaxyEvent::Asteroid,
-                            EventTarget {
-                                planet: target_planet,
-                                duration: Timer::from_seconds(3.0, TimerMode::Once),
+                        let res = if planet.name() == "Alpha" {
+                            orch.broadcast(OrchestratorToPlanet::Asteroid(Asteroid::default()), 0);
+                            orch.planet_rx_p1
+                                .recv_timeout(std::time::Duration::from_millis(100))
+                        } else {
+                            orch.broadcast(OrchestratorToPlanet::Asteroid(Asteroid::default()), 1);
+                            orch.planet_rx_p2
+                                .recv_timeout(std::time::Duration::from_millis(100))
+                        };
+
+                        match res {
+                            Ok(msg) => match msg {
+                                PlanetToOrchestrator::AsteroidAck {
+                                    planet_id,
+                                    rocket: None,
+                                } => {
+                                    commands.spawn((
+                                        GalaxyEvent::Asteroid,
+                                        EventTarget {
+                                            planet: target_planet,
+                                            duration: Timer::from_seconds(3.0, TimerMode::Once),
+                                        },
+                                    ));
+                                    format!("☄️ Asteroid approaching planet {}!", planet.name())
+                                }
+                                PlanetToOrchestrator::AsteroidAck {
+                                    planet_id,
+                                    rocket: Some(_),
+                                } => {
+                                    format!(
+                                        "☄️ Asteroid approaching planet {} Was destroyed by a rocket",
+                                        planet.name()
+                                    )
+                                }
+                                _other => format!("Wrong message received"),
                             },
-                        ));
-                        format!("☄️ Asteroid approaching planet {}!", planet.name())
+                            Err(e) => format!("Error {e}"),
+                        }
                     }
                     _ => "🌌 Nothing happening this cycle.".to_string(),
                 };
@@ -128,10 +147,12 @@ pub fn event_visual_system(
 // ===== Event Handler System =====
 
 pub fn event_handler_system(
+    mut commands: Commands,
     time: Res<Time>,
     mut event_query: Query<(&GalaxyEvent, &mut EventTarget)>,
     planet_query: Query<&Planet>,
     mut log_query: Query<&mut Text, With<LogText>>,
+    orch: Res<Orchestrator>,
 ) {
     for (event, mut target) in &mut event_query {
         target.duration.tick(time.delta());
@@ -141,10 +162,29 @@ pub fn event_handler_system(
         {
             let log_message = match event {
                 GalaxyEvent::Sunray => {
+                    let res = if planet.name() == "Alpha" {
+                        orch.broadcast(OrchestratorToPlanet::Sunray(Sunray::default()), 0);
+                        orch.planet_rx_p1
+                            .recv_timeout(std::time::Duration::from_millis(100))
+                    } else {
+                        orch.broadcast(OrchestratorToPlanet::Sunray(Sunray::default()), 1);
+                        orch.planet_rx_p2
+                            .recv_timeout(std::time::Duration::from_millis(100))
+                    };
+
+                    match res {
+                        Ok(msg) => match msg {
+                            PlanetToOrchestrator::SunrayAck { planet_id } => {
+                                info!("Sunray received by {planet_id}")
+                            }
+                            _other => warn!("Wrong message received"),
+                        },
+                        Err(e) => warn!("Error {e}"),
+                    }
                     format!("✨ Sunray hit {}! Energy increased.", planet.name())
                 }
                 GalaxyEvent::Asteroid => {
-                    //commands.entity(target.planet).despawn();
+                    commands.entity(target.planet).despawn();
                     format!("💥 Asteroid hit {}! Damage taken.", planet.name())
                 }
             };

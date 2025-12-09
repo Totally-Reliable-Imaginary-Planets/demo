@@ -1,4 +1,6 @@
 use bevy::prelude::*;
+use common_game::protocols::messages::*;
+use crossbeam_channel::*;
 
 use crate::explorer::Explorer;
 use crate::explorer::Landed;
@@ -41,8 +43,86 @@ struct PlanetAlpha;
 #[derive(Component)]
 struct PlanetBeta;
 
+#[derive(Resource)]
+pub struct Orchestrator {
+    pub orch_tx_p1: Sender<OrchestratorToPlanet>,
+    pub orch_rx_p1: Receiver<OrchestratorToPlanet>,
+    pub orch_tx_p2: Sender<OrchestratorToPlanet>,
+    pub orch_rx_p2: Receiver<OrchestratorToPlanet>,
+    pub planet_tx_p1: Sender<PlanetToOrchestrator>,
+    pub planet_rx_p1: Receiver<PlanetToOrchestrator>,
+    pub planet_tx_p2: Sender<PlanetToOrchestrator>,
+    pub planet_rx_p2: Receiver<PlanetToOrchestrator>,
+    pub expl_tx: Sender<ExplorerToPlanet>,
+    pub expl_rx: Receiver<ExplorerToPlanet>,
+}
+
+impl Orchestrator {
+    pub fn new() -> Self {
+        let (orch_tx_p1, orch_rx_p1) = unbounded();
+        let (planet_tx_p1, planet_rx_p1) = unbounded();
+        let (orch_tx_p2, orch_rx_p2) = unbounded();
+        let (planet_tx_p2, planet_rx_p2) = unbounded();
+        let (expl_tx, expl_rx) = unbounded();
+
+        Self {
+            orch_tx_p1,
+            orch_rx_p1,
+            orch_tx_p2,
+            orch_rx_p2,
+            planet_tx_p1,
+            planet_rx_p1,
+            planet_tx_p2,
+            planet_rx_p2,
+            expl_tx,
+            expl_rx,
+        }
+    }
+
+    // Send command to planets
+    pub fn send_to_planet_id(
+        &self,
+        msg: PlanetToOrchestrator,
+        id: u32,
+    ) -> Result<(), SendError<PlanetToOrchestrator>> {
+        if id == 0 {
+            return self.planet_tx_p1.send(msg);
+        }
+        self.planet_tx_p2.send(msg)
+    }
+
+    // Broadcast orchestrator command
+    pub fn broadcast(
+        &self,
+        msg: OrchestratorToPlanet,
+        id: u32,
+    ) -> Result<(), SendError<OrchestratorToPlanet>> {
+        if id == 0 {
+            return self.orch_tx_p1.send(msg);
+        }
+        self.orch_tx_p2.send(msg)
+    }
+
+    // Send explorer data
+    pub fn send_explorer_data(
+        &self,
+        msg: ExplorerToPlanet,
+    ) -> Result<(), SendError<ExplorerToPlanet>> {
+        self.expl_tx.send(msg)
+    }
+}
+
 fn setup(mut commands: Commands, mut dialog_query: Query<&mut Visibility, With<LogText>>) {
+    let orchestrator = Orchestrator::new();
+
     // Planets
+    let mut p1 = trip::trip(
+        0,
+        orchestrator.orch_rx_p1.clone(),
+        orchestrator.planet_tx_p1.clone(),
+        orchestrator.expl_rx.clone(),
+    )
+    .expect("Error createing planet1");
     let planet1 = commands
         .spawn((
             Sprite {
@@ -51,11 +131,18 @@ fn setup(mut commands: Commands, mut dialog_query: Query<&mut Visibility, With<L
                 ..default()
             },
             Transform::from_xyz(-400.0, 0.0, 0.0),
-            Planet::new("Planet Alpha", Vec2::new(-400.0, 0.0)),
+            Planet::new("Alpha", Vec2::new(-400.0, 0.0)),
             PlanetAlpha,
         ))
         .id();
 
+    let mut p2 = trip::trip(
+        1,
+        orchestrator.orch_rx_p2.clone(),
+        orchestrator.planet_tx_p2.clone(),
+        orchestrator.expl_rx.clone(),
+    )
+    .expect("Error createing planet2");
     let planet2 = commands
         .spawn((
             Sprite {
@@ -64,7 +151,7 @@ fn setup(mut commands: Commands, mut dialog_query: Query<&mut Visibility, With<L
                 ..default()
             },
             Transform::from_xyz(400.0, 0.0, 0.0),
-            Planet::new("Planet Beta", Vec2::new(400.0, 0.0)),
+            Planet::new("Beta", Vec2::new(400.0, 0.0)),
             PlanetBeta,
         ))
         .id();
@@ -89,6 +176,44 @@ fn setup(mut commands: Commands, mut dialog_query: Query<&mut Visibility, With<L
     commands.insert_resource(PlanetEntities {
         planets: vec![planet1, planet2],
     });
+
+    std::thread::spawn(move || {
+        p1.run();
+    });
+    std::thread::spawn(move || {
+        p2.run();
+    });
+
+    orchestrator
+        .orch_tx_p1
+        .send(OrchestratorToPlanet::StartPlanetAI)
+        .expect("Failed to send start messages");
+    orchestrator
+        .orch_tx_p2
+        .send(OrchestratorToPlanet::StartPlanetAI)
+        .expect("Failed to send start messages");
+    match orchestrator
+        .planet_rx_p1
+        .recv_timeout(std::time::Duration::from_millis(100))
+        .expect("No message received")
+    {
+        PlanetToOrchestrator::StartPlanetAIResult { planet_id } => {
+            println!("Planet {planet_id} started")
+        }
+        _other => panic!("Failed to start planet"),
+    }
+    match orchestrator
+        .planet_rx_p2
+        .recv_timeout(std::time::Duration::from_millis(100))
+        .expect("No message received")
+    {
+        PlanetToOrchestrator::StartPlanetAIResult { planet_id } => {
+            println!("Planet {planet_id} started")
+        }
+        _other => panic!("Failed to start planet"),
+    }
+
+    commands.insert_resource(orchestrator);
 
     for mut visibility in &mut dialog_query {
         *visibility = Visibility::Visible;
