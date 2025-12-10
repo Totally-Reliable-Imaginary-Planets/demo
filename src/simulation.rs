@@ -29,9 +29,9 @@ use crate::TakeOffPlanetButton;
 use crate::YesButton;
 
 #[derive(Resource)]
-pub struct PlanetAlphaStateRes(usize, usize, bool);
+pub struct PlanetAlphaStateRes(pub usize, pub usize, pub bool);
 #[derive(Resource)]
-pub struct PlanetBetaStateRes(usize, usize, bool);
+pub struct PlanetBetaStateRes(pub usize, pub usize, pub bool);
 
 pub fn simulation_plugin(app: &mut App) {
     app.add_systems(OnEnter(GameState::Playing), setup)
@@ -52,7 +52,6 @@ pub fn simulation_plugin(app: &mut App) {
                 supported_resource_button_system,
                 available_energy_cell_button_system,
                 generate_supported_resource_button_system,
-                check_status_changes,
             )
                 .run_if(in_state(GameState::Playing)),
         )
@@ -166,18 +165,6 @@ impl Orchestrator {
             planet_tx_p2,
             planet_rx_p2,
         }
-    }
-
-    // Send command to planets
-    pub fn send_to_planet_id(
-        &self,
-        msg: PlanetToOrchestrator,
-        id: u32,
-    ) -> Result<(), SendError<PlanetToOrchestrator>> {
-        if id == 0 {
-            return self.planet_tx_p1.send(msg);
-        }
-        self.planet_tx_p2.send(msg)
     }
 
     // Broadcast orchestrator command
@@ -315,10 +302,7 @@ fn setup(
         .recv_timeout(std::time::Duration::from_millis(100))
         .expect("No message received")
     {
-        PlanetToOrchestrator::InternalStateResponse {
-            planet_id,
-            planet_state,
-        } => {
+        PlanetToOrchestrator::InternalStateResponse { planet_state, .. } => {
             commands.insert_resource(PlanetAlphaStateRes(
                 planet_state.energy_cells.len(),
                 planet_state.charged_cells_count,
@@ -332,10 +316,7 @@ fn setup(
         .recv_timeout(std::time::Duration::from_millis(100))
         .expect("No message received")
     {
-        PlanetToOrchestrator::InternalStateResponse {
-            planet_id,
-            planet_state,
-        } => {
+        PlanetToOrchestrator::InternalStateResponse { planet_state, .. } => {
             commands.insert_resource(PlanetBetaStateRes(
                 planet_state.energy_cells.len(),
                 planet_state.charged_cells_count,
@@ -350,60 +331,6 @@ fn setup(
 
     for mut visibility in &mut dialog_query {
         *visibility = Visibility::Visible;
-    }
-}
-
-fn check_status_changes(
-    mut planet_alpha_state: ResMut<PlanetAlphaStateRes>,
-    mut planet_beta_state: ResMut<PlanetBetaStateRes>,
-    orch: Res<Orchestrator>,
-) {
-    match orch
-        .orch_tx_p1
-        .send(OrchestratorToPlanet::InternalStateRequest)
-    {
-        Ok(()) => {}
-        Err(e) => warn!("Encountered error {e} while sending message"),
-    }
-    match orch
-        .orch_tx_p2
-        .send(OrchestratorToPlanet::InternalStateRequest)
-    {
-        Ok(()) => {}
-        Err(e) => warn!("Encountered error {e} while sending message"),
-    }
-    match orch
-        .planet_rx_p1
-        .recv_timeout(std::time::Duration::from_millis(100))
-    {
-        Ok(msg) => match msg {
-            PlanetToOrchestrator::InternalStateResponse {
-                planet_id,
-                planet_state,
-            } => {
-                planet_alpha_state.1 = planet_state.charged_cells_count;
-                planet_alpha_state.2 = planet_state.has_rocket;
-            }
-            _other => warn!("Wrong message received"),
-        },
-        Err(e) => warn!("An error occurred while waiting or request timed out"),
-    }
-
-    match orch
-        .planet_rx_p2
-        .recv_timeout(std::time::Duration::from_millis(100))
-    {
-        Ok(msg) => match msg {
-            PlanetToOrchestrator::InternalStateResponse {
-                planet_id,
-                planet_state,
-            } => {
-                planet_beta_state.1 = planet_state.charged_cells_count;
-                planet_beta_state.2 = planet_state.has_rocket;
-            }
-            _other => warn!("Wrong message received"),
-        },
-        Err(e) => warn!("An error occurred while waiting or request timed out"),
     }
 }
 

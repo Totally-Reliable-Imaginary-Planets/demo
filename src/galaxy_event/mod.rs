@@ -10,6 +10,8 @@ use crate::EventSpawnTimer;
 use crate::LogText;
 use crate::Planet;
 use crate::PlanetEntities;
+use crate::simulation::PlanetAlphaStateRes;
+use crate::simulation::PlanetBetaStateRes;
 
 #[derive(Component)]
 pub enum GalaxyEvent {
@@ -35,6 +37,8 @@ pub fn event_spawner_system(
     planet_query: Query<&Planet>,
     mut log_query: Query<&mut Text, With<LogText>>,
     orch: Res<Orchestrator>,
+    mut planet_alpha_state: ResMut<PlanetAlphaStateRes>,
+    mut planet_beta_state: ResMut<PlanetBetaStateRes>,
 ) {
     if timer.0.tick(time.delta()).just_finished() {
         // Don't spawn if there's already an active event
@@ -61,21 +65,80 @@ pub fn event_spawner_system(
                         let res = if planet.name() == "Alpha" {
                             let _ = orch
                                 .broadcast(OrchestratorToPlanet::Asteroid(Asteroid::default()), 0);
-                            orch.planet_rx_p1
+                            let res = orch
+                                .planet_rx_p1
+                                .recv_timeout(std::time::Duration::from_millis(100));
+
+                            match orch
+                                .orch_tx_p1
+                                .send(OrchestratorToPlanet::InternalStateRequest)
+                            {
+                                Ok(()) => info!("Sended an InternalStateRequest to planet Alpha"),
+                                Err(e) => warn!("Encountered error {e} while sending message"),
+                            }
+
+                            match orch
+                                .planet_rx_p1
                                 .recv_timeout(std::time::Duration::from_millis(100))
+                            {
+                                Ok(msg) => match msg {
+                                    PlanetToOrchestrator::InternalStateResponse {
+                                        planet_state,
+                                        ..
+                                    } => {
+                                        planet_alpha_state.1 = planet_state.charged_cells_count;
+                                        planet_alpha_state.2 = planet_state.has_rocket;
+                                    }
+                                    _other => warn!("Wrong message received"),
+                                },
+                                Err(e) => {
+                                    warn!(
+                                        "An error occurred while waiting or request timed out, Err: {e}"
+                                    )
+                                }
+                            }
+                            res
                         } else {
                             let _ = orch
                                 .broadcast(OrchestratorToPlanet::Asteroid(Asteroid::default()), 1);
-                            orch.planet_rx_p2
+                            let res = orch
+                                .planet_rx_p2
+                                .recv_timeout(std::time::Duration::from_millis(100));
+
+                            match orch
+                                .orch_tx_p2
+                                .send(OrchestratorToPlanet::InternalStateRequest)
+                            {
+                                Ok(()) => info!("Sended an InternalStateRequest to planet Beta"),
+                                Err(e) => warn!("Encountered error {e} while sending message"),
+                            }
+
+                            match orch
+                                .planet_rx_p2
                                 .recv_timeout(std::time::Duration::from_millis(100))
+                            {
+                                Ok(msg) => match msg {
+                                    PlanetToOrchestrator::InternalStateResponse {
+                                        planet_state,
+                                        ..
+                                    } => {
+                                        planet_beta_state.1 = planet_state.charged_cells_count;
+                                        planet_beta_state.2 = planet_state.has_rocket;
+                                    }
+                                    _other => warn!("Wrong message received"),
+                                },
+                                Err(e) => {
+                                    warn!(
+                                        "An error occurred while waiting or request timed out, Err: {e}"
+                                    )
+                                }
+                            }
+                            res
                         };
 
                         match res {
                             Ok(msg) => match msg {
-                                PlanetToOrchestrator::AsteroidAck {
-                                    planet_id,
-                                    rocket: None,
-                                } => {
+                                PlanetToOrchestrator::AsteroidAck { rocket: None, .. } => {
                                     commands.spawn((
                                         GalaxyEvent::Asteroid,
                                         EventTarget {
@@ -86,8 +149,7 @@ pub fn event_spawner_system(
                                     format!("☄️ Asteroid approaching planet {}!", planet.name())
                                 }
                                 PlanetToOrchestrator::AsteroidAck {
-                                    planet_id,
-                                    rocket: Some(_),
+                                    rocket: Some(_), ..
                                 } => {
                                     format!(
                                         "☄️ Asteroid approaching planet {} Was destroyed by a rocket",
