@@ -14,14 +14,21 @@ pub mod color {
     pub const BACKGROUND: Color = Color::BLACK;
 }
 
-pub fn title_font() -> TextFont {
-    TextFont::default()
-        .with_font_size(font::TITLE_SIZE)
-        .with_line_height(LineHeight::RelativeToFont(2.0))
+pub fn title_font(asset_server: &Res<AssetServer>) -> TextFont {
+    TextFont {
+        font: asset_server.load("fonts/DepartureMonoNerdFont-Regular.otf"),
+        font_size: font::TITLE_SIZE,
+        line_height: LineHeight::RelativeToFont(2.0),
+        ..default()
+    }
 }
 
-pub fn basic_font() -> TextFont {
-    TextFont::default().with_font_size(font::BASIC_SIZE)
+pub fn basic_font(asset_server: &Res<AssetServer>) -> TextFont {
+    TextFont {
+        font: asset_server.load("fonts/DepartureMonoNerdFont-Regular.otf"),
+        font_size: font::BASIC_SIZE,
+        ..default()
+    }
 }
 
 pub fn background_color() -> BackgroundColor {

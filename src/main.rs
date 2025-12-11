@@ -71,7 +71,7 @@ struct AvailableEnergyCellButton;
 #[derive(Component)]
 struct TakeOffPlanetButton;
 
-fn setup(mut commands: Commands) {
+fn setup(mut commands: Commands, asset_server: Res<AssetServer>) {
     // Camera
     commands.spawn((
         Camera2d,
@@ -83,7 +83,7 @@ fn setup(mut commands: Commands) {
     let padding = 12.0;
     let width = 20.0;
     let max_width = width + 5.0;
-    let height = 30.0;
+    let height = 20.0;
 
     // Planet states
     commands.spawn((
@@ -104,28 +104,28 @@ fn setup(mut commands: Commands) {
         children![
             (
                 Text::new("Planet Alpha"),
-                theme::title_font(),
+                theme::title_font(&asset_server),
                 theme::text_color(),
             ),
             (
-                Text::new("Charged cell:"),
-                theme::basic_font(),
+                Text::new("Energy cell:"),
+                theme::basic_font(&asset_server),
                 theme::text_color(),
             ),
             (
                 Text::new("..."),
-                theme::basic_font(),
+                theme::basic_font(&asset_server),
                 theme::text_color(),
                 PlanetAlphaCell,
             ),
             (
                 Text::new("Rocket:"),
-                theme::basic_font(),
+                theme::basic_font(&asset_server),
                 theme::text_color(),
             ),
             (
                 Text::new("0"),
-                theme::basic_font(),
+                theme::basic_font(&asset_server),
                 theme::text_color(),
                 PlanetAlphaRocket
             )
@@ -150,28 +150,28 @@ fn setup(mut commands: Commands) {
         children![
             (
                 Text::new("Planet Beta"),
-                theme::title_font(),
+                theme::title_font(&asset_server),
                 theme::text_color(),
             ),
             (
-                Text::new("Charged cell:"),
-                theme::basic_font(),
+                Text::new("Energy cell:"),
+                theme::basic_font(&asset_server),
                 theme::text_color(),
             ),
             (
                 Text::new("..."),
-                theme::basic_font(),
+                theme::basic_font(&asset_server),
                 theme::text_color(),
                 PlanetBetaCell
             ),
             (
                 Text::new("Rocket:"),
-                theme::basic_font(),
+                theme::basic_font(&asset_server),
                 theme::text_color(),
             ),
             (
                 Text::new("0"),
-                theme::basic_font(),
+                theme::basic_font(&asset_server),
                 theme::text_color(),
                 PlanetBetaRocket,
             )
@@ -186,15 +186,18 @@ fn setup(mut commands: Commands) {
             left: Val::Percent(2.5),
             width: Val::Percent(95.0),
             height: Val::Percent(30.0),
+            padding: UiRect::all(Val::Px(padding)),
             overflow: Overflow::scroll_y(),
             ..default()
         },
         Visibility::Visible,
         theme::background_color(),
-        Text::new(""),
-        theme::basic_font(),
-        theme::text_color(),
-        LogText,
+        children![(
+            Text::new(""),
+            theme::basic_font(&asset_server),
+            theme::text_color(),
+            LogText,
+        )],
     ));
 
     commands.spawn((

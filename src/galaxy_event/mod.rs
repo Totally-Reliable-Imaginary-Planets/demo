@@ -59,7 +59,7 @@ pub fn event_spawner_system(
                                 duration: Timer::from_seconds(3.0, TimerMode::Once),
                             },
                         ));
-                        format!("☀️ Sunray approaching planet {}!", planet.name())
+                        format!(" Sunray approaching planet {}!", planet.name())
                     }
                     1 => {
                         let res = if planet.name() == "Alpha" {
@@ -146,13 +146,13 @@ pub fn event_spawner_system(
                                             duration: Timer::from_seconds(3.0, TimerMode::Once),
                                         },
                                     ));
-                                    format!("☄️ Asteroid approaching planet {}!", planet.name())
+                                    format!(" Asteroid approaching planet {}!", planet.name())
                                 }
                                 PlanetToOrchestrator::AsteroidAck {
                                     rocket: Some(_), ..
                                 } => {
                                     format!(
-                                        "☄️ Asteroid approaching planet {} Was destroyed by a rocket",
+                                        " Asteroid approaching planet {} Was destroyed by a rocket 󱎯",
                                         planet.name()
                                     )
                                 }
@@ -161,7 +161,7 @@ pub fn event_spawner_system(
                             Err(e) => format!("Error {e}"),
                         }
                     }
-                    _ => "🌌 Nothing happening this cycle.".to_string(),
+                    _ => "󰒲 Nothing happening this cycle.".to_string(),
                 };
 
                 // Update UI text instead of printing
@@ -309,11 +309,11 @@ pub fn event_handler_system(
                         },
                         Err(e) => warn!("Error {e}"),
                     }
-                    format!("✨ Sunray hit {}! Energy increased.", planet.name())
+                    format!("󰂄 Sunray hit {}! Energy increased.", planet.name())
                 }
                 GalaxyEvent::Asteroid => {
                     commands.entity(target.planet).despawn();
-                    format!("💥 Asteroid hit {}! Damage taken.", planet.name())
+                    format!("󰈸 Asteroid hit {}! Planet destroyed.", planet.name())
                 }
             };
 

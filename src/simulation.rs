@@ -65,6 +65,13 @@ pub fn simulation_plugin(app: &mut App) {
         );
 }
 
+fn cell_string(charged_cell: usize, empty_cell: usize) -> String {
+    let mut cells = String::new();
+    cells.push_str(&"󰁹 ".repeat(charged_cell));
+    cells.push_str(&"󰁺 ".repeat(empty_cell));
+    cells
+}
+
 // Update system for Planet Alpha
 fn update_planet_alpha_ui(
     planet_state: Res<PlanetAlphaStateRes>,
@@ -74,12 +81,16 @@ fn update_planet_alpha_ui(
     if planet_state.is_changed() {
         // Update charged cell display
         if let Ok(mut text) = cell_query.single_mut() {
-            text.0 = format!("{}/{}", planet_state.1, planet_state.0)
+            text.0 = cell_string(planet_state.1, planet_state.0 - planet_state.1);
         }
 
         // Update rocket count
         if let Ok(mut text) = rocket_query.single_mut() {
-            text.0 = planet_state.2.to_string();
+            if planet_state.2 {
+                text.0 = "󱎯".to_string();
+            } else {
+                text.0 = "".to_string();
+            }
         }
     }
 }
@@ -93,12 +104,16 @@ fn update_planet_beta_ui(
     if planet_state.is_changed() {
         // Update charged cell display
         if let Ok(mut text) = cell_query.single_mut() {
-            text.0 = format!("{}/{}", planet_state.1, planet_state.0)
+            text.0 = cell_string(planet_state.1, planet_state.0 - planet_state.1);
         }
 
         // Update rocket count
         if let Ok(mut text) = rocket_query.single_mut() {
-            text.0 = planet_state.2.to_string();
+            if planet_state.2 {
+                text.0 = "󱎯".to_string();
+            } else {
+                text.0 = "".to_string();
+            }
         }
     }
 }
