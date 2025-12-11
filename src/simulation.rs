@@ -1,8 +1,10 @@
 use bevy::prelude::*;
 use common_game::components::resource::BasicResource;
 use common_game::components::resource::BasicResourceType;
-use common_game::protocols::messages::*;
-use crossbeam_channel::*;
+use common_game::protocols::messages::{
+    ExplorerToPlanet, OrchestratorToPlanet, PlanetToExplorer, PlanetToOrchestrator,
+};
+use crossbeam_channel::{Receiver, SendError, Sender, unbounded};
 
 use crate::explorer::Explorer;
 use crate::explorer::Landed;
@@ -89,7 +91,7 @@ fn update_planet_alpha_ui(
             if planet_state.2 {
                 text.0 = "󱎯".to_string();
             } else {
-                text.0 = "".to_string();
+                text.0 = String::new();
             }
         }
     }
@@ -112,7 +114,7 @@ fn update_planet_beta_ui(
             if planet_state.2 {
                 text.0 = "󱎯".to_string();
             } else {
-                text.0 = "".to_string();
+                text.0 = String::new();
             }
         }
     }
@@ -289,7 +291,7 @@ fn setup(
         .expect("No message received")
     {
         PlanetToOrchestrator::StartPlanetAIResult { planet_id } => {
-            info!("Planet {planet_id} started")
+            info!("Planet {planet_id} started");
         }
         _other => panic!("Failed to start planet"),
     }
@@ -299,7 +301,7 @@ fn setup(
         .expect("No message received")
     {
         PlanetToOrchestrator::StartPlanetAIResult { planet_id } => {
-            info!("Planet {planet_id} started")
+            info!("Planet {planet_id} started");
         }
         _other => panic!("Failed to start planet"),
     }
@@ -423,8 +425,8 @@ fn yes_button_system(
                     .planet_rx_p1
                     .recv_timeout(std::time::Duration::from_millis(100));
 
-                match res {
-                    Ok(msg) => match msg {
+                if let Ok(msg) = res {
+                    match msg {
                         PlanetToOrchestrator::IncomingExplorerResponse {
                             planet_id,
                             res: Ok(()),
@@ -440,8 +442,9 @@ fn yes_button_system(
                             );
                         }
                         _other => warn!("Wrong message received"),
-                    },
-                    Err(_) => warn!("Connection timed out"),
+                    }
+                } else {
+                    warn!("Connection timed out");
                 }
                 if let Ok(mut text) = log_query.single_mut() {
                     text.0 = format!("Explorer Landed on planet Alpha\n{}", text.0);
@@ -459,8 +462,8 @@ fn yes_button_system(
                     .planet_rx_p2
                     .recv_timeout(std::time::Duration::from_millis(100));
 
-                match res {
-                    Ok(msg) => match msg {
+                if let Ok(msg) = res {
+                    match msg {
                         PlanetToOrchestrator::IncomingExplorerResponse {
                             planet_id,
                             res: Ok(()),
@@ -476,8 +479,9 @@ fn yes_button_system(
                             );
                         }
                         _other => warn!("Wrong message received"),
-                    },
-                    Err(_) => warn!("Connection timed out"),
+                    }
+                } else {
+                    warn!("Connection timed out");
                 }
                 if let Ok(mut text) = log_query.single_mut() {
                     text.0 = format!("Explorer Landed on planet Beta\n{}", text.0);
@@ -569,8 +573,8 @@ fn available_energy_cell_button_system(
                     .planet_rx
                     .recv_timeout(std::time::Duration::from_millis(100));
 
-                let energy_cell: u32 = match res {
-                    Ok(msg) => match msg {
+                let energy_cell: u32 = if let Ok(msg) = res {
+                    match msg {
                         PlanetToExplorer::AvailableEnergyCellResponse { available_cells } => {
                             info!("This planet now has {available_cells} charged energy cell");
                             available_cells
@@ -579,11 +583,10 @@ fn available_energy_cell_button_system(
                             warn!("Wrong message received");
                             0
                         }
-                    },
-                    Err(_) => {
-                        warn!("Connection timed out");
-                        0
                     }
+                } else {
+                    warn!("Connection timed out");
+                    0
                 };
                 if let Ok(mut text) = log_query.single_mut() {
                     text.0 = format!(
@@ -601,8 +604,8 @@ fn available_energy_cell_button_system(
                     .planet_rx
                     .recv_timeout(std::time::Duration::from_millis(100));
 
-                let energy_cell: u32 = match res {
-                    Ok(msg) => match msg {
+                let energy_cell: u32 = if let Ok(msg) = res {
+                    match msg {
                         PlanetToExplorer::AvailableEnergyCellResponse { available_cells } => {
                             info!("This planet now has {available_cells} charged energy cell");
                             available_cells
@@ -611,11 +614,10 @@ fn available_energy_cell_button_system(
                             warn!("Wrong message received");
                             0
                         }
-                    },
-                    Err(_) => {
-                        warn!("Connection timed out");
-                        0
                     }
+                } else {
+                    warn!("Connection timed out");
+                    0
                 };
                 if let Ok(mut text) = log_query.single_mut() {
                     text.0 = format!(
@@ -647,8 +649,8 @@ fn generate_supported_resource_button_system(
                     .planet_rx
                     .recv_timeout(std::time::Duration::from_millis(100));
 
-                let resource: Option<BasicResourceType> = match res {
-                    Ok(msg) => match msg {
+                let resource: Option<BasicResourceType> = if let Ok(msg) = res {
+                    match msg {
                         PlanetToExplorer::SupportedResourceResponse { resource_list } => {
                             info!("From this planet you can generate: {:?}", resource_list);
                             Some(*resource_list.iter().next().unwrap())
@@ -657,11 +659,10 @@ fn generate_supported_resource_button_system(
                             warn!("Wrong message received");
                             None
                         }
-                    },
-                    Err(_) => {
-                        warn!("Connection timed out");
-                        None
                     }
+                } else {
+                    warn!("Connection timed out");
+                    None
                 };
                 let _ = expl
                     .expl_tx_p1
@@ -673,8 +674,8 @@ fn generate_supported_resource_button_system(
                     .planet_rx
                     .recv_timeout(std::time::Duration::from_millis(100));
 
-                let gen_resource: Option<BasicResource> = match res {
-                    Ok(msg) => match msg {
+                let gen_resource: Option<BasicResource> = if let Ok(msg) = res {
+                    match msg {
                         PlanetToExplorer::GenerateResourceResponse { resource } => {
                             info!("Generated: {:?}", resource);
                             resource
@@ -683,11 +684,10 @@ fn generate_supported_resource_button_system(
                             warn!("Wrong message received");
                             None
                         }
-                    },
-                    Err(_) => {
-                        warn!("Connection timed out");
-                        None
                     }
+                } else {
+                    warn!("Connection timed out");
+                    None
                 };
                 if let Ok(mut text) = log_query.single_mut() {
                     text.0 = format!(
@@ -705,8 +705,8 @@ fn generate_supported_resource_button_system(
                     .planet_rx
                     .recv_timeout(std::time::Duration::from_millis(100));
 
-                let resource: Option<BasicResourceType> = match res {
-                    Ok(msg) => match msg {
+                let resource: Option<BasicResourceType> = if let Ok(msg) = res {
+                    match msg {
                         PlanetToExplorer::SupportedResourceResponse { resource_list } => {
                             info!("From this planet you can generate: {:?}", resource_list);
                             Some(*resource_list.iter().next().unwrap())
@@ -715,11 +715,10 @@ fn generate_supported_resource_button_system(
                             warn!("Wrong message received");
                             None
                         }
-                    },
-                    Err(_) => {
-                        warn!("Connection timed out");
-                        None
                     }
+                } else {
+                    warn!("Connection timed out");
+                    None
                 };
                 let _ = expl
                     .expl_tx_p2
@@ -731,8 +730,8 @@ fn generate_supported_resource_button_system(
                     .planet_rx
                     .recv_timeout(std::time::Duration::from_millis(100));
 
-                let gen_resource: Option<BasicResource> = match res {
-                    Ok(msg) => match msg {
+                let gen_resource: Option<BasicResource> = if let Ok(msg) = res {
+                    match msg {
                         PlanetToExplorer::GenerateResourceResponse { resource } => {
                             info!("Generated: {:?}", resource);
                             resource
@@ -741,11 +740,10 @@ fn generate_supported_resource_button_system(
                             warn!("Wrong message received");
                             None
                         }
-                    },
-                    Err(_) => {
-                        warn!("Connection timed out");
-                        None
                     }
+                } else {
+                    warn!("Connection timed out");
+                    None
                 };
                 if let Ok(mut text) = log_query.single_mut() {
                     text.0 = format!(
@@ -777,8 +775,8 @@ fn supported_resource_button_system(
                     .planet_rx
                     .recv_timeout(std::time::Duration::from_millis(100));
 
-                let resource: Option<BasicResourceType> = match res {
-                    Ok(msg) => match msg {
+                let resource: Option<BasicResourceType> = if let Ok(msg) = res {
+                    match msg {
                         PlanetToExplorer::SupportedResourceResponse { resource_list } => {
                             info!("From this planet you can generate: {:?}", resource_list);
                             Some(*resource_list.iter().next().unwrap())
@@ -787,11 +785,10 @@ fn supported_resource_button_system(
                             warn!("Wrong message received");
                             None
                         }
-                    },
-                    Err(_) => {
-                        warn!("Connection timed out");
-                        None
                     }
+                } else {
+                    warn!("Connection timed out");
+                    None
                 };
                 if let Ok(mut text) = log_query.single_mut() {
                     text.0 = format!("\nPlanet Alpha can generate: {:?}\n{}", resource, text.0);
@@ -806,8 +803,8 @@ fn supported_resource_button_system(
                     .planet_rx
                     .recv_timeout(std::time::Duration::from_millis(100));
 
-                let resource: Option<BasicResourceType> = match res {
-                    Ok(msg) => match msg {
+                let resource: Option<BasicResourceType> = if let Ok(msg) = res {
+                    match msg {
                         PlanetToExplorer::SupportedResourceResponse { resource_list } => {
                             info!("From this planet you can generate: {:?}", resource_list);
                             Some(*resource_list.iter().next().unwrap())
@@ -816,11 +813,10 @@ fn supported_resource_button_system(
                             warn!("Wrong message received");
                             None
                         }
-                    },
-                    Err(_) => {
-                        warn!("Connection timed out");
-                        None
                     }
+                } else {
+                    warn!("Connection timed out");
+                    None
                 };
                 if let Ok(mut text) = log_query.single_mut() {
                     text.0 = format!("\nPlanet Beta can generate: {:?}\n{}", resource, text.0);
@@ -855,8 +851,8 @@ fn take_off_button_system(
                     .planet_rx_p1
                     .recv_timeout(std::time::Duration::from_millis(100));
 
-                match res {
-                    Ok(msg) => match msg {
+                if let Ok(msg) = res {
+                    match msg {
                         PlanetToOrchestrator::OutgoingExplorerResponse {
                             planet_id,
                             res: Ok(()),
@@ -872,8 +868,9 @@ fn take_off_button_system(
                             );
                         }
                         _other => warn!("Wrong message received"),
-                    },
-                    Err(_) => warn!("Connection timed out"),
+                    }
+                } else {
+                    warn!("Connection timed out");
                 }
                 if let Ok(mut text) = log_query.single_mut() {
                     text.0 = format!("\nExplorer take off from planet Alpha\n{}", text.0);
@@ -889,8 +886,8 @@ fn take_off_button_system(
                 let res = orch
                     .planet_rx_p2
                     .recv_timeout(std::time::Duration::from_millis(100));
-                match res {
-                    Ok(msg) => match msg {
+                if let Ok(msg) = res {
+                    match msg {
                         PlanetToOrchestrator::OutgoingExplorerResponse {
                             planet_id,
                             res: Ok(()),
@@ -906,8 +903,9 @@ fn take_off_button_system(
                             );
                         }
                         _other => warn!("Wrong message received"),
-                    },
-                    Err(_) => warn!("Connection timed out"),
+                    }
+                } else {
+                    warn!("Connection timed out");
                 }
                 if let Ok(mut text) = log_query.single_mut() {
                     text.0 = format!("\nExplorer take off from planet Beta\n{}", text.0);

@@ -94,7 +94,7 @@ pub fn event_spawner_system(
                                 Err(e) => {
                                     warn!(
                                         "An error occurred while waiting or request timed out, Err: {e}"
-                                    )
+                                    );
                                 }
                             }
                             res
@@ -130,7 +130,7 @@ pub fn event_spawner_system(
                                 Err(e) => {
                                     warn!(
                                         "An error occurred while waiting or request timed out, Err: {e}"
-                                    )
+                                    );
                                 }
                             }
                             res
@@ -156,7 +156,7 @@ pub fn event_spawner_system(
                                         planet.name()
                                     )
                                 }
-                                _other => format!("Wrong message received"),
+                                _other => "Wrong message received".to_string(),
                             },
                             Err(e) => format!("Error {e}"),
                         }
@@ -259,7 +259,7 @@ pub fn event_handler_system(
                             Err(e) => {
                                 warn!(
                                     "An error occurred while waiting or request timed out, Err: {e}"
-                                )
+                                );
                             }
                         }
                         res
@@ -294,7 +294,7 @@ pub fn event_handler_system(
                             Err(e) => {
                                 warn!(
                                     "An error occurred while waiting or request timed out, Err: {e}"
-                                )
+                                );
                             }
                         }
                         res
@@ -303,7 +303,7 @@ pub fn event_handler_system(
                     match res {
                         Ok(msg) => match msg {
                             PlanetToOrchestrator::SunrayAck { planet_id } => {
-                                info!("Sunray received by {planet_id}")
+                                info!("Sunray received by {planet_id}");
                             }
                             _other => warn!("Wrong message received"),
                         },

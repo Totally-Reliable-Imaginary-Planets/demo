@@ -71,15 +71,11 @@ pub fn explorer_movement_system_wasd(
 
     //if keyboard_input.pressed(KeyCode::KeyW) { direction.y += 1.0; }
     //if keyboard_input.pressed(KeyCode::KeyS) { direction.y -= 1.0; }
-    if keyboard_input.pressed(KeyCode::KeyA) {
-        if reached.single().map_or(true, |r| r.0) {
-            direction.x -= 1.0;
-        }
+    if keyboard_input.pressed(KeyCode::KeyA) && reached.single().map_or(true, |r| r.0) {
+        direction.x -= 1.0;
     }
-    if keyboard_input.pressed(KeyCode::KeyD) {
-        if !reached.single().map_or(false, |r| r.0) {
-            direction.x += 1.0;
-        }
+    if keyboard_input.pressed(KeyCode::KeyD) && !reached.single().is_ok_and(|r| r.0) {
+        direction.x += 1.0;
     }
 
     if direction.length() > 0.0 {
