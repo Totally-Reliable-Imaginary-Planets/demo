@@ -636,6 +636,9 @@ fn generate_supported_resource_button_system(
     interaction_query: Query<&Interaction, (Changed<Interaction>, With<ExtractResourceButton>)>,
     mut log_query: Query<&mut Text, With<LogText>>,
     expl: Res<ExplorerHandler>,
+    orch: Res<Orchestrator>,
+    mut planet_alpha_state: ResMut<PlanetAlphaStateRes>,
+    mut planet_beta_state: ResMut<PlanetBetaStateRes>,
 ) {
     for interaction in &interaction_query {
         if *interaction == Interaction::Pressed {
@@ -695,6 +698,29 @@ fn generate_supported_resource_button_system(
                         gen_resource, text.0
                     );
                 }
+                match orch
+                    .orch_tx_p1
+                    .send(OrchestratorToPlanet::InternalStateRequest)
+                {
+                    Ok(()) => info!("Sended an InternalStateRequest to planet Alpha"),
+                    Err(e) => warn!("Encountered error {e} while sending message"),
+                }
+
+                match orch
+                    .planet_rx_p1
+                    .recv_timeout(std::time::Duration::from_millis(100))
+                {
+                    Ok(msg) => match msg {
+                        PlanetToOrchestrator::InternalStateResponse { planet_state, .. } => {
+                            planet_alpha_state.1 = planet_state.charged_cells_count;
+                            planet_alpha_state.2 = planet_state.has_rocket;
+                        }
+                        _other => warn!("Wrong message received"),
+                    },
+                    Err(e) => {
+                        warn!("An error occurred while waiting or request timed out, Err: {e}");
+                    }
+                }
             } else {
                 let _ = expl
                     .expl_tx_p2
@@ -750,6 +776,29 @@ fn generate_supported_resource_button_system(
                         "\nPlanet Beta has generated: {:?}\n{}",
                         gen_resource, text.0
                     );
+                }
+                match orch
+                    .orch_tx_p2
+                    .send(OrchestratorToPlanet::InternalStateRequest)
+                {
+                    Ok(()) => info!("Sended an InternalStateRequest to planet Beta"),
+                    Err(e) => warn!("Encountered error {e} while sending message"),
+                }
+
+                match orch
+                    .planet_rx_p2
+                    .recv_timeout(std::time::Duration::from_millis(100))
+                {
+                    Ok(msg) => match msg {
+                        PlanetToOrchestrator::InternalStateResponse { planet_state, .. } => {
+                            planet_beta_state.1 = planet_state.charged_cells_count;
+                            planet_beta_state.2 = planet_state.has_rocket;
+                        }
+                        _other => warn!("Wrong message received"),
+                    },
+                    Err(e) => {
+                        warn!("An error occurred while waiting or request timed out, Err: {e}");
+                    }
                 }
             }
             info!("No button pressed");

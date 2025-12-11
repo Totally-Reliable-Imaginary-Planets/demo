@@ -1682,9 +1682,9 @@ dependencies = [
 
 [[package]]
 name = "cc"
-version = "1.2.48"
+version = "1.2.49"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "c481bdbf0ed3b892f6f806287d72acd515b352a4ec27a208489b8c1bc839633a"
+checksum = "90583009037521a116abf44494efecd645ba48b6622457080f080b85544e2215"
 dependencies = [
  "find-msvc-tools",
  "jobserver",
@@ -1753,8 +1753,8 @@ dependencies = [
 
 [[package]]
 name = "common-game"
-version = "1.0.0"
-source = "git+ssh://git@uni.github.com/unitn-ap-2025/common.git?branch=main#057049b785e5c6e6ad3cd3967b6ff44b5989769c"
+version = "1.1.0"
+source = "git+ssh://git@uni.github.com/unitn-ap-2025/common.git?branch=main#68d38631bb12e5e1b33f47a33e4ba7b0e914c80b"
 dependencies = [
  "crossbeam-channel",
  "lazy_static",
@@ -2246,9 +2246,9 @@ checksum = "1d674e81391d1e1ab681a28d99df07927c6d4aa5b027d7da16ba32d1d21ecd99"
 
 [[package]]
 name = "flate2"
-version = "1.1.7"
+version = "1.1.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "a2152dbcb980c05735e2a651d96011320a949eb31a0c8b38b72645ce97dec676"
+checksum = "bfe33edd8e85a12a67454e37f8c75e730830d83e313556ab9ebf9ee7fbeb3bfb"
 dependencies = [
  "crc32fast",
  "miniz_oxide",
@@ -4068,9 +4068,9 @@ checksum = "0fda2ff0d084019ba4d7c6f371c95d8fd75ce3524c3cb8fb653a3023f6323e64"
 
 [[package]]
 name = "simd-adler32"
-version = "0.3.7"
+version = "0.3.8"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "d66dc143e6b11c1eddc06d5c423cfc97062865baf299914ab64caa38182078fe"
+checksum = "e320a6c5ad31d271ad523dcf3ad13e2767ad8b1cb8f047f75a8aeaf8da139da2"
 
 [[package]]
 name = "skrifa"
@@ -4090,9 +4090,9 @@ checksum = "7a2ae44ef20feb57a68b23d846850f861394c2e02dc425a50098ae8c90267589"
 
 [[package]]
 name = "slotmap"
-version = "1.1.0"
+version = "1.1.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "811fec94324ff439b2d5e4a1cf88cc5b6c09d92358715d600b2fe91c0489b5cb"
+checksum = "bdd58c3c93c3d278ca835519292445cb4b0d4dc59ccfdf7ceadaab3f8aeb4038"
 dependencies = [
  "version_check",
 ]
@@ -4354,9 +4354,9 @@ dependencies = [
 
 [[package]]
 name = "toml_edit"
-version = "0.23.8"
+version = "0.23.9"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "5a9b7ac41d92f2d2803f233e297127bac397df7b337e0460a1cc39d6c006dee4"
+checksum = "5d7cbc3b4b49633d57a0509303158ca50de80ae32c265093b24c414705807832"
 dependencies = [
  "indexmap",
  "toml_datetime",
@@ -4460,10 +4460,11 @@ dependencies = [
 [[package]]
 name = "trip"
 version = "0.4.0"
-source = "git+ssh://git@uni.github.com/Totally-Reliable-Imaginary-Planets/TRIP.git?branch=main#5212ca405bb201e69f8b7e8bcc0d485c2b82df62"
+source = "git+ssh://git@uni.github.com/Totally-Reliable-Imaginary-Planets/TRIP.git?branch=develop#4ef3ddd658532600f51e411687e71993b192f562"
 dependencies = [
  "common-game",
  "crossbeam-channel",
+ "log",
 ]
 
 [[package]]
