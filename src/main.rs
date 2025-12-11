@@ -1,11 +1,11 @@
 use bevy::prelude::*;
-
 mod explorer;
 mod galaxy_event;
 mod planet;
 mod resources;
 mod settings;
 mod simulation;
+mod theme;
 
 use crate::explorer::Explorer;
 use crate::planet::Planet;
@@ -81,6 +81,9 @@ fn setup(mut commands: Commands) {
 
     let spacing = 20.0;
     let padding = 12.0;
+    let width = 20.0;
+    let max_width = width + 5.0;
+    let height = 30.0;
 
     // Planet states
     commands.spawn((
@@ -90,50 +93,40 @@ fn setup(mut commands: Commands) {
             top: Val::Px(spacing),
             left: Val::Px(spacing),
             padding: UiRect::all(Val::Px(padding)),
-            width: Val::Percent(15.0),
-            max_width: Val::Percent(20.0),
-            height: Val::Percent(30.0),
+            width: Val::Percent(width),
+            max_width: Val::Percent(max_width),
+            height: Val::Percent(height),
             ..default()
         },
         PlanetAlphaState,
         Visibility::Visible,
-        BackgroundColor(Color::BLACK.with_alpha(0.7)),
+        theme::background_color(),
         children![
             (
                 Text::new("Planet Alpha"),
-                TextFont::default().with_font_size(18.0),
-                TextColor(Color::WHITE),
-            ),
-            (
-                Node {
-                    width: Val::Percent(100.0),
-                    height: Val::Px(2.0),
-                    top: Val::Px(2.0),
-                    bottom: Val::Px(2.0),
-                    ..default()
-                },
-                BackgroundColor(Color::srgba(0.5, 0.5, 0.5, 0.5).into(),),
+                theme::title_font(),
+                theme::text_color(),
             ),
             (
                 Text::new("Charged cell:"),
-                TextFont::default().with_font_size(16.0),
-                TextColor(Color::WHITE),
+                theme::basic_font(),
+                theme::text_color(),
             ),
             (
                 Text::new("..."),
-                TextFont::default().with_font_size(16.0),
-                TextColor(Color::WHITE),
+                theme::basic_font(),
+                theme::text_color(),
                 PlanetAlphaCell,
             ),
             (
                 Text::new("Rocket:"),
-                TextFont::default().with_font_size(16.0),
-                TextColor(Color::WHITE),
+                theme::basic_font(),
+                theme::text_color(),
             ),
             (
                 Text::new("0"),
-                TextFont::default().with_font_size(16.0),
-                TextColor(Color::WHITE),
+                theme::basic_font(),
+                theme::text_color(),
                 PlanetAlphaRocket
             )
         ],
@@ -146,50 +139,40 @@ fn setup(mut commands: Commands) {
             top: Val::Px(spacing),
             right: Val::Px(spacing),
             padding: UiRect::all(Val::Px(padding)),
-            width: Val::Percent(15.0),
-            max_width: Val::Percent(20.0),
-            height: Val::Percent(30.0),
+            width: Val::Percent(width),
+            max_width: Val::Percent(max_width),
+            height: Val::Percent(height),
             ..default()
         },
         PlanetBetaState,
         Visibility::Visible,
-        BackgroundColor(Color::BLACK.with_alpha(0.7)),
+        theme::background_color(),
         children![
             (
                 Text::new("Planet Beta"),
-                TextFont::default().with_font_size(18.0),
-                TextColor(Color::WHITE),
-            ),
-            (
-                Node {
-                    width: Val::Percent(100.0),
-                    height: Val::Px(2.0),
-                    top: Val::Px(2.0),
-                    bottom: Val::Px(2.0),
-                    ..default()
-                },
-                BackgroundColor(Color::srgba(0.5, 0.5, 0.5, 0.5).into(),),
+                theme::title_font(),
+                theme::text_color(),
             ),
             (
                 Text::new("Charged cell:"),
-                TextFont::default().with_font_size(16.0),
-                TextColor(Color::WHITE),
+                theme::basic_font(),
+                theme::text_color(),
             ),
             (
                 Text::new("..."),
-                TextFont::default().with_font_size(16.0),
-                TextColor(Color::WHITE),
+                theme::basic_font(),
+                theme::text_color(),
                 PlanetBetaCell
             ),
             (
                 Text::new("Rocket:"),
-                TextFont::default().with_font_size(16.0),
-                TextColor(Color::WHITE),
+                theme::basic_font(),
+                theme::text_color(),
             ),
             (
                 Text::new("0"),
-                TextFont::default().with_font_size(16.0),
-                TextColor(Color::WHITE),
+                theme::basic_font(),
+                theme::text_color(),
                 PlanetBetaRocket,
             )
         ],
@@ -207,10 +190,10 @@ fn setup(mut commands: Commands) {
             ..default()
         },
         Visibility::Visible,
-        BackgroundColor(Color::BLACK.with_alpha(0.7)),
+        theme::background_color(),
         Text::new(""),
-        TextFont::default().with_font_size(16.0),
-        TextColor(Color::WHITE),
+        theme::basic_font(),
+        theme::text_color(),
         LogText,
     ));
 
@@ -227,7 +210,7 @@ fn setup(mut commands: Commands) {
         },
         LandedPlanetDialog,
         Visibility::Hidden,
-        BackgroundColor(Color::BLACK.with_alpha(0.7)),
+        theme::background_color(),
         children![
             (Text::new("What would you do on this planet?"),),
             (
@@ -316,7 +299,7 @@ fn land_on_planet_dialog() -> impl Bundle {
             ..default()
         },
         Visibility::Hidden,
-        BackgroundColor(Color::BLACK.with_alpha(0.7)),
+        theme::background_color(),
         PlanetDialog,
         children![(
             Node {
@@ -326,7 +309,6 @@ fn land_on_planet_dialog() -> impl Bundle {
                 justify_content: JustifyContent::SpaceBetween,
                 ..default()
             },
-            BackgroundColor(Color::BLACK.with_alpha(0.7)),
             children![
                 (
                     Text::new("You have reached a planet do you want to land on it?"),
