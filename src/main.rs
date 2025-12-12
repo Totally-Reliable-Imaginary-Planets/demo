@@ -79,103 +79,30 @@ fn setup(mut commands: Commands, asset_server: Res<AssetServer>) {
         Transform::from_xyz(0.0, 0.0, 1000.0),
     ));
 
-    let spacing = 20.0;
+    let spacing = 2.0;
     let padding = 12.0;
-    let width = 20.0;
-    let max_width = width + 5.0;
-    let height = 20.0;
 
     // Planet states
-    commands.spawn((
-        Node {
-            position_type: PositionType::Absolute,
-            flex_direction: FlexDirection::Column,
-            top: Val::Px(spacing),
-            left: Val::Px(spacing),
-            padding: UiRect::all(Val::Px(padding)),
-            width: Val::Percent(width),
-            max_width: Val::Percent(max_width),
-            height: Val::Percent(height),
-            ..default()
-        },
+    commands.spawn(create_planet_state(
+        &asset_server,
+        "Planet Alpha",
+        Val::Auto,
+        Val::Percent(spacing),
+        Val::Percent(spacing),
         PlanetAlphaState,
-        Visibility::Visible,
-        theme::background_color(),
-        children![
-            (
-                Text::new("Planet Alpha"),
-                theme::title_font(&asset_server),
-                theme::text_color(),
-            ),
-            (
-                Text::new("Energy cell:"),
-                theme::basic_font(&asset_server),
-                theme::text_color(),
-            ),
-            (
-                Text::new("..."),
-                theme::basic_font(&asset_server),
-                theme::text_color(),
-                PlanetAlphaCell,
-            ),
-            (
-                Text::new("Rocket:"),
-                theme::basic_font(&asset_server),
-                theme::text_color(),
-            ),
-            (
-                Text::new("0"),
-                theme::basic_font(&asset_server),
-                theme::text_color(),
-                PlanetAlphaRocket
-            )
-        ],
+        PlanetAlphaCell,
+        PlanetAlphaRocket,
     ));
 
-    commands.spawn((
-        Node {
-            position_type: PositionType::Absolute,
-            flex_direction: FlexDirection::Column,
-            top: Val::Px(spacing),
-            right: Val::Px(spacing),
-            padding: UiRect::all(Val::Px(padding)),
-            width: Val::Percent(width),
-            max_width: Val::Percent(max_width),
-            height: Val::Percent(height),
-            ..default()
-        },
+    commands.spawn(create_planet_state(
+        &asset_server,
+        "Planet Beta",
+        Val::Percent(spacing),
+        Val::Auto,
+        Val::Percent(spacing),
         PlanetBetaState,
-        Visibility::Visible,
-        theme::background_color(),
-        children![
-            (
-                Text::new("Planet Beta"),
-                theme::title_font(&asset_server),
-                theme::text_color(),
-            ),
-            (
-                Text::new("Energy cell:"),
-                theme::basic_font(&asset_server),
-                theme::text_color(),
-            ),
-            (
-                Text::new("..."),
-                theme::basic_font(&asset_server),
-                theme::text_color(),
-                PlanetBetaCell
-            ),
-            (
-                Text::new("Rocket:"),
-                theme::basic_font(&asset_server),
-                theme::text_color(),
-            ),
-            (
-                Text::new("0"),
-                theme::basic_font(&asset_server),
-                theme::text_color(),
-                PlanetBetaRocket,
-            )
-        ],
+        PlanetBetaCell,
+        PlanetBetaRocket,
     ));
 
     // Log screen
@@ -208,6 +135,7 @@ fn setup(mut commands: Commands, asset_server: Res<AssetServer>) {
             bottom: Val::Percent(35.0),
             left: Val::Percent(35.0),
             width: Val::Percent(30.0),
+            min_width: Val::Px(400.0),
             height: Val::Percent(60.0),
             ..default()
         },
@@ -215,83 +143,155 @@ fn setup(mut commands: Commands, asset_server: Res<AssetServer>) {
         Visibility::Hidden,
         theme::background_color(),
         children![
-            (Text::new("What would you do on this planet?"),),
             (
-                Button,
+                Text::new("What would you do on this planet?"),
+                theme::title_font(&asset_server),
+                theme::text_color(),
+            ),
+            create_button(
+                &asset_server,
+                "Supported Resource",
                 SupportedResourceButton,
-                Node {
-                    width: Val::Percent(90.0),
-                    height: Val::Percent(15.0),
-                    left: Val::Percent(5.0),
-                    border: UiRect::all(px(5)),
-                    // horizontally center child text
-                    justify_content: JustifyContent::Center,
-                    // vertically center child text
-                    align_items: AlignItems::Center,
-                    ..default()
-                },
-                BorderColor::all(Color::WHITE),
-                children![(Text::new("Supported resource"))]
+                Val::Percent(90.0),
+                Val::Percent(15.0),
+                Val::Percent(5.0),
+                Val::Px(5.0),
+                Color::WHITE
             ),
-            (
-                Button,
+            create_button(
+                &asset_server,
+                "Extract Resource",
                 ExtractResourceButton,
-                Node {
-                    width: Val::Percent(90.0),
-                    height: Val::Percent(15.0),
-                    left: Val::Percent(5.0),
-                    border: UiRect::all(px(5)),
-                    // horizontally center child text
-                    justify_content: JustifyContent::Center,
-                    // vertically center child text
-                    align_items: AlignItems::Center,
-                    ..default()
-                },
-                BorderColor::all(Color::WHITE),
-                children![(Text::new("Extract resource"))]
+                Val::Percent(90.0),
+                Val::Percent(15.0),
+                Val::Percent(5.0),
+                Val::Px(5.0),
+                Color::WHITE
             ),
-            (
-                Button,
+            create_button(
+                &asset_server,
+                "Available Energy Cell",
                 AvailableEnergyCellButton,
-                Node {
-                    width: Val::Percent(90.0),
-                    height: Val::Percent(15.0),
-                    left: Val::Percent(5.0),
-                    border: UiRect::all(px(5)),
-                    // horizontally center child text
-                    justify_content: JustifyContent::Center,
-                    // vertically center child text
-                    align_items: AlignItems::Center,
-                    ..default()
-                },
-                BorderColor::all(Color::WHITE),
-                children![(Text::new("Available energy cell"))]
+                Val::Percent(90.0),
+                Val::Percent(15.0),
+                Val::Percent(5.0),
+                Val::Px(5.0),
+                Color::WHITE
             ),
-            (
-                Button,
+            create_button(
+                &asset_server,
+                "Take off",
                 TakeOffPlanetButton,
-                Node {
-                    width: Val::Percent(90.0),
-                    height: Val::Percent(15.0),
-                    left: Val::Percent(5.0),
-                    border: UiRect::all(px(5)),
-                    // horizontally center child text
-                    justify_content: JustifyContent::Center,
-                    // vertically center child text
-                    align_items: AlignItems::Center,
-                    ..default()
-                },
-                BorderColor::all(Color::WHITE),
-                children![(Text::new("Take off planet"))]
-            )
+                Val::Percent(90.0),
+                Val::Percent(15.0),
+                Val::Percent(5.0),
+                Val::Px(5.0),
+                Color::WHITE
+            ),
         ],
     ));
 
     // Spawn land_on_planet_dialog UI
-    commands.spawn(land_on_planet_dialog());
+    commands.spawn(land_on_planet_dialog(&asset_server));
 }
 
-fn land_on_planet_dialog() -> impl Bundle {
+fn create_button(
+    asset_server: &Res<AssetServer>,
+    text: &str,
+    button_component: impl Component,
+    width: Val,
+    height: Val,
+    left: Val,
+    border_stroke: Val,
+    border_color: Color,
+) -> impl Bundle {
+    (
+        Button,
+        button_component,
+        Node {
+            width: width,
+            height: height,
+            left: left,
+            border: UiRect::all(border_stroke),
+            // horizontally center child text
+            justify_content: JustifyContent::Center,
+            // vertically center child text
+            align_items: AlignItems::Center,
+            ..default()
+        },
+        BorderColor::all(border_color),
+        children![(
+            Text::new(text),
+            theme::title_font(asset_server),
+            theme::text_color(),
+        )],
+    )
+}
+
+fn create_planet_state(
+    asset_server: &Res<AssetServer>,
+    planet_name: &str,
+    right: Val,
+    left: Val,
+    top: Val,
+    state: impl Component,
+    cell: impl Component,
+    rocket: impl Component,
+) -> impl Bundle {
+    let padding = 12.0;
+    let width = 10.0;
+    let max_width = width + 5.0;
+    let height = 15.0;
+
+    (
+        Node {
+            position_type: PositionType::Absolute,
+            flex_direction: FlexDirection::Column,
+            top: top,
+            right: right,
+            left: left,
+            padding: UiRect::all(Val::Px(padding)),
+            width: Val::Percent(width),
+            max_width: Val::Percent(max_width),
+            height: Val::Percent(height),
+            ..default()
+        },
+        state,
+        Visibility::Visible,
+        theme::background_color(),
+        children![
+            (
+                Text::new(planet_name),
+                theme::title_font(asset_server),
+                theme::text_color(),
+            ),
+            (
+                Text::new("Energy cell:"),
+                theme::basic_font(asset_server),
+                theme::text_color(),
+            ),
+            (
+                Text::new(""),
+                theme::basic_font(asset_server),
+                theme::text_color(),
+                cell
+            ),
+            (
+                Text::new("Rocket:"),
+                theme::basic_font(asset_server),
+                theme::text_color(),
+            ),
+            (
+                Text::new(""),
+                theme::basic_font(asset_server),
+                theme::text_color(),
+                rocket,
+            )
+        ],
+    )
+}
+
+fn land_on_planet_dialog(asset_server: &Res<AssetServer>) -> impl Bundle {
     (
         Node {
             position_type: PositionType::Absolute,
@@ -315,8 +315,8 @@ fn land_on_planet_dialog() -> impl Bundle {
             children![
                 (
                     Text::new("You have reached a planet do you want to land on it?"),
-                    TextFont::default().with_font_size(16.0),
-                    TextColor(Color::WHITE),
+                    theme::title_font(asset_server),
+                    theme::text_color(),
                 ),
                 (
                     Node {
@@ -325,46 +325,26 @@ fn land_on_planet_dialog() -> impl Bundle {
                         ..default()
                     },
                     children![
-                        (
-                            Button,
-                            Node {
-                                width: px(150),
-                                height: px(65),
-                                border: UiRect::all(px(5)),
-                                // horizontally center child text
-                                justify_content: JustifyContent::Center,
-                                // vertically center child text
-                                align_items: AlignItems::Center,
-                                ..default()
-                            },
-                            BorderColor::all(Color::WHITE),
+                        create_button(
+                            &asset_server,
+                            "Yes",
                             YesButton,
-                            children![(
-                                Text::new("Yes"),
-                                TextFont::default().with_font_size(16.0),
-                                TextColor(Color::WHITE),
-                            )]
+                            Val::Percent(40.0),
+                            Val::Percent(100.0),
+                            Val::Auto,
+                            Val::Px(5.0),
+                            Color::WHITE
                         ),
-                        (
-                            Button,
-                            Node {
-                                width: px(150),
-                                height: px(65),
-                                border: UiRect::all(px(5)),
-                                // horizontally center child text
-                                justify_content: JustifyContent::Center,
-                                // vertically center child text
-                                align_items: AlignItems::Center,
-                                ..default()
-                            },
-                            BorderColor::all(Color::WHITE),
+                        create_button(
+                            &asset_server,
+                            "No",
                             NoButton,
-                            children![(
-                                Text::new("No"),
-                                TextFont::default().with_font_size(16.0),
-                                TextColor(Color::WHITE),
-                            )],
-                        )
+                            Val::Percent(40.0),
+                            Val::Percent(100.0),
+                            Val::Auto,
+                            Val::Px(5.0),
+                            Color::WHITE
+                        ),
                     ],
                 )
             ],
