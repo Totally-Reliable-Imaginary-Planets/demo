@@ -5,7 +5,9 @@ use common_game::protocols::messages::{
     ExplorerToPlanet, OrchestratorToPlanet, PlanetToExplorer, PlanetToOrchestrator,
 };
 use crossbeam_channel::{Receiver, SendError, Sender, unbounded};
+use std::any::Any;
 use std::collections::HashMap;
+use std::thread::JoinHandle;
 
 use crate::explorer::Explorer;
 use crate::explorer::Landed;
@@ -140,10 +142,10 @@ struct PlanetBeta;
 
 #[derive(Resource)]
 pub struct ExplorerHandler {
-    pub planet_tx: Sender<PlanetToExplorer>,
-    pub planet_rx: Receiver<PlanetToExplorer>,
-    pub expl_tx: HashMap<u32, Sender<ExplorerToPlanet>>,
-    pub id: u32,
+    planet_tx: Sender<PlanetToExplorer>,
+    planet_rx: Receiver<PlanetToExplorer>,
+    expl_tx: HashMap<u32, Sender<ExplorerToPlanet>>,
+    id: u32,
 }
 
 impl ExplorerHandler {
@@ -157,8 +159,31 @@ impl ExplorerHandler {
         }
     }
 
+    pub fn id(&self) -> u32 {
+        self.id
+    }
+
+    pub fn planet_tx(&self) -> Sender<PlanetToExplorer> {
+        self.planet_tx.clone()
+    }
+
     pub fn add_ep_tx(&mut self, id: u32, tx: Sender<ExplorerToPlanet>) {
         self.expl_tx.insert(id, tx);
+    }
+
+    pub fn recv_from_planet(
+        &self,
+    ) -> Result<PlanetToExplorer, crossbeam_channel::RecvTimeoutError> {
+        self.planet_rx
+            .recv_timeout(std::time::Duration::from_millis(100))
+    }
+
+    pub fn send_to_planet_id(
+        &self,
+        id: u32,
+        msg: ExplorerToPlanet,
+    ) -> Result<(), SendError<ExplorerToPlanet>> {
+        self.expl_tx.get(&id).unwrap().send(msg)
     }
 }
 
@@ -166,14 +191,16 @@ impl ExplorerHandler {
 pub struct Orchestrator {
     orch_tx: HashMap<u32, Sender<OrchestratorToPlanet>>,
     planet_rx: HashMap<u32, Receiver<PlanetToOrchestrator>>,
+    planet_handle: HashMap<u32, JoinHandle<()>>,
 }
 
 impl Orchestrator {
     pub fn new() -> Self {
-        let orch_tx = HashMap::new();
-        let planet_rx = HashMap::new();
-
-        Self { orch_tx, planet_rx }
+        Self {
+            orch_tx: HashMap::new(),
+            planet_rx: HashMap::new(),
+            planet_handle: HashMap::new(),
+        }
     }
 
     pub fn add_op_tx(&mut self, id: u32, tx: Sender<OrchestratorToPlanet>) {
@@ -181,6 +208,13 @@ impl Orchestrator {
     }
     pub fn add_po_rx(&mut self, id: u32, rx: Receiver<PlanetToOrchestrator>) {
         self.planet_rx.insert(id, rx);
+    }
+    pub fn add_planet_handle(&mut self, id: u32, handle: JoinHandle<()>) {
+        self.planet_handle.insert(id, handle);
+    }
+
+    pub fn join_planet_id(&mut self, id: u32) -> Result<(), Box<dyn Any + Send>> {
+        self.planet_handle.remove(&id).unwrap().join()
     }
 
     pub fn send_to_planet_id(
@@ -200,17 +234,6 @@ impl Orchestrator {
             .unwrap()
             .recv_timeout(std::time::Duration::from_millis(100))
     }
-    /*// Broadcast orchestrator command
-    pub fn broadcast(
-        &self,
-        msg: OrchestratorToPlanet,
-        id: u32,
-    ) -> Result<(), SendError<OrchestratorToPlanet>> {
-        /*if id == 0 {
-            return self.orch_tx_p1.send(msg);
-        }*/
-        self.orch_tx_p2.send(msg)
-    }*/
 }
 
 fn setup(
@@ -232,7 +255,7 @@ fn setup(
     orchestrator.add_po_rx(0, planet_rx_p1);
     explorer_handl.add_ep_tx(0, expl_tx_p1);
     let mut p1 =
-        trip::trip(0, orch_rx_p1, planet_tx_p1, expl_rx_p1).expect("Error createing planet1");
+        trip::trip(0, orch_rx_p1, planet_tx_p1, expl_rx_p1).expect("Error creating planet1");
     let planet1 = commands
         .spawn((
             Sprite {
@@ -288,12 +311,15 @@ fn setup(
         planets: vec![planet1, planet2],
     });
 
-    std::thread::spawn(move || {
+    let p1_handle = std::thread::spawn(move || {
         let _ = p1.run();
     });
-    std::thread::spawn(move || {
+    let p2_handle = std::thread::spawn(move || {
         let _ = p2.run();
     });
+
+    orchestrator.add_planet_handle(0, p1_handle);
+    orchestrator.add_planet_handle(1, p2_handle);
 
     orchestrator
         .send_to_planet_id(0, OrchestratorToPlanet::StartPlanetAI)
@@ -427,8 +453,8 @@ fn yes_button_system(
                 let _ = orch.send_to_planet_id(
                     0,
                     OrchestratorToPlanet::IncomingExplorerRequest {
-                        explorer_id: expl.id,
-                        new_mpsc_sender: expl.planet_tx.clone(),
+                        explorer_id: expl.id(),
+                        new_mpsc_sender: expl.planet_tx(),
                     },
                 );
                 let res = orch.recv_from_planet_id(0);
@@ -462,8 +488,8 @@ fn yes_button_system(
                 let _ = orch.send_to_planet_id(
                     1,
                     OrchestratorToPlanet::IncomingExplorerRequest {
-                        explorer_id: expl.id,
-                        new_mpsc_sender: expl.planet_tx.clone(),
+                        explorer_id: expl.id(),
+                        new_mpsc_sender: expl.planet_tx(),
                     },
                 );
                 let res = orch.recv_from_planet_id(1);
@@ -570,14 +596,13 @@ fn available_energy_cell_button_system(
     for interaction in &interaction_query {
         if *interaction == Interaction::Pressed {
             if explorer_query.translation.x < 0.0 {
-                let _ = expl.expl_tx.get(&0).unwrap().send(
+                let _ = expl.send_to_planet_id(
+                    0,
                     ExplorerToPlanet::AvailableEnergyCellRequest {
-                        explorer_id: expl.id,
+                        explorer_id: expl.id(),
                     },
                 );
-                let res = expl
-                    .planet_rx
-                    .recv_timeout(std::time::Duration::from_millis(100));
+                let res = expl.recv_from_planet();
 
                 let energy_cell: u32 = if let Ok(msg) = res {
                     match msg {
@@ -601,14 +626,13 @@ fn available_energy_cell_button_system(
                     );
                 }
             } else {
-                let _ = expl.expl_tx.get(&1).unwrap().send(
+                let _ = expl.send_to_planet_id(
+                    1,
                     ExplorerToPlanet::AvailableEnergyCellRequest {
-                        explorer_id: expl.id,
+                        explorer_id: expl.id(),
                     },
                 );
-                let res = expl
-                    .planet_rx
-                    .recv_timeout(std::time::Duration::from_millis(100));
+                let res = expl.recv_from_planet();
 
                 let energy_cell: u32 = if let Ok(msg) = res {
                     match msg {
@@ -649,14 +673,13 @@ fn generate_supported_resource_button_system(
     for interaction in &interaction_query {
         if *interaction == Interaction::Pressed {
             if explorer_query.translation.x < 0.0 {
-                let _ = expl.expl_tx.get(&0).unwrap().send(
+                let _ = expl.send_to_planet_id(
+                    0,
                     ExplorerToPlanet::SupportedResourceRequest {
-                        explorer_id: expl.id,
+                        explorer_id: expl.id(),
                     },
                 );
-                let res = expl
-                    .planet_rx
-                    .recv_timeout(std::time::Duration::from_millis(100));
+                let res = expl.recv_from_planet();
 
                 let resource: Option<BasicResourceType> = if let Ok(msg) = res {
                     match msg {
@@ -673,17 +696,14 @@ fn generate_supported_resource_button_system(
                     warn!("Connection timed out");
                     None
                 };
-                let _ =
-                    expl.expl_tx
-                        .get(&0)
-                        .unwrap()
-                        .send(ExplorerToPlanet::GenerateResourceRequest {
-                            explorer_id: expl.id,
-                            resource: resource.unwrap(),
-                        });
-                let res = expl
-                    .planet_rx
-                    .recv_timeout(std::time::Duration::from_millis(100));
+                let _ = expl.send_to_planet_id(
+                    0,
+                    ExplorerToPlanet::GenerateResourceRequest {
+                        explorer_id: expl.id(),
+                        resource: resource.unwrap(),
+                    },
+                );
+                let res = expl.recv_from_planet();
 
                 let gen_resource: Option<BasicResource> = if let Ok(msg) = res {
                     match msg {
@@ -724,14 +744,13 @@ fn generate_supported_resource_button_system(
                     }
                 }
             } else {
-                let _ = expl.expl_tx.get(&1).unwrap().send(
+                let _ = expl.send_to_planet_id(
+                    1,
                     ExplorerToPlanet::SupportedResourceRequest {
-                        explorer_id: expl.id,
+                        explorer_id: expl.id(),
                     },
                 );
-                let res = expl
-                    .planet_rx
-                    .recv_timeout(std::time::Duration::from_millis(100));
+                let res = expl.recv_from_planet();
 
                 let resource: Option<BasicResourceType> = if let Ok(msg) = res {
                     match msg {
@@ -748,17 +767,14 @@ fn generate_supported_resource_button_system(
                     warn!("Connection timed out");
                     None
                 };
-                let _ =
-                    expl.expl_tx
-                        .get(&1)
-                        .unwrap()
-                        .send(ExplorerToPlanet::GenerateResourceRequest {
-                            explorer_id: expl.id,
-                            resource: resource.unwrap(),
-                        });
-                let res = expl
-                    .planet_rx
-                    .recv_timeout(std::time::Duration::from_millis(100));
+                let _ = expl.send_to_planet_id(
+                    1,
+                    ExplorerToPlanet::GenerateResourceRequest {
+                        explorer_id: expl.id(),
+                        resource: resource.unwrap(),
+                    },
+                );
+                let res = expl.recv_from_planet();
 
                 let gen_resource: Option<BasicResource> = if let Ok(msg) = res {
                     match msg {
@@ -813,14 +829,13 @@ fn supported_resource_button_system(
     for interaction in &interaction_query {
         if *interaction == Interaction::Pressed {
             if explorer_query.translation.x < 0.0 {
-                let _ = expl.expl_tx.get(&0).unwrap().send(
+                let _ = expl.send_to_planet_id(
+                    0,
                     ExplorerToPlanet::SupportedResourceRequest {
-                        explorer_id: expl.id,
+                        explorer_id: expl.id(),
                     },
                 );
-                let res = expl
-                    .planet_rx
-                    .recv_timeout(std::time::Duration::from_millis(100));
+                let res = expl.recv_from_planet();
 
                 let resource: Option<BasicResourceType> = if let Ok(msg) = res {
                     match msg {
@@ -841,14 +856,13 @@ fn supported_resource_button_system(
                     text.0 = format!("\nPlanet Alpha can generate: {:?}\n{}", resource, text.0);
                 }
             } else {
-                let _ = expl.expl_tx.get(&1).unwrap().send(
+                let _ = expl.send_to_planet_id(
+                    1,
                     ExplorerToPlanet::SupportedResourceRequest {
-                        explorer_id: expl.id,
+                        explorer_id: expl.id(),
                     },
                 );
-                let res = expl
-                    .planet_rx
-                    .recv_timeout(std::time::Duration::from_millis(100));
+                let res = expl.recv_from_planet();
 
                 let resource: Option<BasicResourceType> = if let Ok(msg) = res {
                     match msg {
@@ -891,7 +905,7 @@ fn take_off_button_system(
                 let _ = orch.send_to_planet_id(
                     0,
                     OrchestratorToPlanet::OutgoingExplorerRequest {
-                        explorer_id: expl.id,
+                        explorer_id: expl.id(),
                     },
                 );
                 let res = orch.recv_from_planet_id(0);
@@ -925,7 +939,7 @@ fn take_off_button_system(
                 let _ = orch.send_to_planet_id(
                     1,
                     OrchestratorToPlanet::OutgoingExplorerRequest {
-                        explorer_id: expl.id,
+                        explorer_id: expl.id(),
                     },
                 );
                 let res = orch.recv_from_planet_id(1);
