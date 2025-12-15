@@ -126,13 +126,7 @@ pub fn event_spawner_system(
                                             );
                                         }
                                     }
-                                    match orch.join_planet_id(planet_id) {
-                                        Ok(()) => info!("planet {planet_id} joined successfully"),
-                                        Err(e) => error!(
-                                            "and error {:?} occurred while joining the planet {planet_id}",
-                                            e
-                                        ),
-                                    }
+                                    orch.join_planet_id(planet_id);
                                     format!(" Asteroid approaching planet {}!", planet.name())
                                 }
                                 PlanetToOrchestrator::AsteroidAck {

@@ -213,12 +213,15 @@ impl Orchestrator {
         self.planet_handle.insert(id, handle);
     }
 
-    pub fn join_planet_id(&mut self, id: u32) -> Result<(), Box<dyn Any + Send>> {
-        self.planet_handle.remove(&id).unwrap().join()
+    pub fn join_planet_id(&mut self, id: u32) {
+        match self.planet_handle.remove(&id).unwrap().join() {
+            Ok(()) => info!("planet {id} joined successfully"),
+            Err(e) => error!("and error {:?} occurred while joining the planet {id}", e),
+        }
     }
 
     pub fn send_to_planet_id(&self, id: u32, msg: OrchestratorToPlanet) {
-        info!("Sended an {:?} to planet {id}", &msg);
+        info!("attempting to send message {:?} to planet {id}", &msg);
         match self.orch_tx.get(&id).unwrap().send(msg) {
             Ok(()) => {
                 info!("Sended message to planet {id}")
