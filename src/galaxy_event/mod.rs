@@ -64,21 +64,16 @@ pub fn event_spawner_system(
                     1 => {
                         let planet_id = if planet.name() == "Alpha" { 0 } else { 1 };
                         let res = {
-                            let _ = orch.send_to_planet_id(
+                            orch.send_to_planet_id(
                                 planet_id,
                                 OrchestratorToPlanet::Asteroid(Asteroid::default()),
                             );
                             let res = orch.recv_from_planet_id(planet_id);
 
-                            match orch.send_to_planet_id(
+                            orch.send_to_planet_id(
                                 planet_id,
                                 OrchestratorToPlanet::InternalStateRequest,
-                            ) {
-                                Ok(()) => {
-                                    info!("Sended an InternalStateRequest to planet {planet_id}")
-                                }
-                                Err(e) => warn!("Encountered error {e} while sending message"),
-                            }
+                            );
 
                             match orch.recv_from_planet_id(planet_id) {
                                 Ok(msg) => match msg {
@@ -114,24 +109,15 @@ pub fn event_spawner_system(
                                             duration: Timer::from_seconds(3.0, TimerMode::Once),
                                         },
                                     ));
-                                    match orch.send_to_planet_id(
+                                    orch.send_to_planet_id(
                                         planet_id,
                                         OrchestratorToPlanet::KillPlanet,
-                                    ) {
-                                        Ok(()) => {
-                                            info!(
-                                                "Sended a KillPlanet message to planet {planet_id}"
-                                            )
-                                        }
-                                        Err(e) => {
-                                            warn!("Encountered error {e} while sending message")
-                                        }
-                                    }
+                                    );
                                     match orch.recv_from_planet_id(planet_id) {
                                         Ok(msg) => match msg {
                                             PlanetToOrchestrator::KillPlanetResult {
                                                 planet_id,
-                                            } => info!("planet {planet_id} killed successfully"),
+                                            } => info!("planet {planet_id} kiled successfully"),
                                             _other => warn!("Wrong message received"),
                                         },
                                         Err(e) => {
@@ -229,54 +215,32 @@ pub fn event_handler_system(
         {
             let log_message = match event {
                 GalaxyEvent::Sunray => {
-                    let res = if planet.name() == "Alpha" {
-                        let _ = orch
-                            .send_to_planet_id(0, OrchestratorToPlanet::Sunray(Sunray::default()));
-                        let res = orch.recv_from_planet_id(0);
+                    let planet_id = if planet.name() == "Alpha" { 0 } else { 0 };
+                    let res = {
+                        orch.send_to_planet_id(
+                            planet_id,
+                            OrchestratorToPlanet::Sunray(Sunray::default()),
+                        );
+                        let res = orch.recv_from_planet_id(planet_id);
 
-                        match orch.send_to_planet_id(0, OrchestratorToPlanet::InternalStateRequest)
-                        {
-                            Ok(()) => info!("Sended an InternalStateRequest to planet Alpha"),
-                            Err(e) => warn!("Encountered error {e} while sending message"),
-                        }
+                        orch.send_to_planet_id(
+                            planet_id,
+                            OrchestratorToPlanet::InternalStateRequest,
+                        );
 
-                        match orch.recv_from_planet_id(0) {
+                        match orch.recv_from_planet_id(planet_id) {
                             Ok(msg) => match msg {
                                 PlanetToOrchestrator::InternalStateResponse {
                                     planet_state,
                                     ..
                                 } => {
-                                    planet_alpha_state.1 = planet_state.charged_cells_count;
-                                    planet_alpha_state.2 = planet_state.has_rocket;
-                                }
-                                _other => warn!("Wrong message received"),
-                            },
-                            Err(e) => {
-                                warn!(
-                                    "An error occurred while waiting or request timed out, Err: {e}"
-                                );
-                            }
-                        }
-                        res
-                    } else {
-                        let _ = orch
-                            .send_to_planet_id(1, OrchestratorToPlanet::Sunray(Sunray::default()));
-                        let res = orch.recv_from_planet_id(1);
-
-                        match orch.send_to_planet_id(1, OrchestratorToPlanet::InternalStateRequest)
-                        {
-                            Ok(()) => info!("Sended an InternalStateRequest to planet Beta"),
-                            Err(e) => warn!("Encountered error {e} while sending message"),
-                        }
-
-                        match orch.recv_from_planet_id(1) {
-                            Ok(msg) => match msg {
-                                PlanetToOrchestrator::InternalStateResponse {
-                                    planet_state,
-                                    ..
-                                } => {
-                                    planet_beta_state.1 = planet_state.charged_cells_count;
-                                    planet_beta_state.2 = planet_state.has_rocket;
+                                    if planet_id == 0 {
+                                        planet_alpha_state.1 = planet_state.charged_cells_count;
+                                        planet_alpha_state.2 = planet_state.has_rocket;
+                                    } else {
+                                        planet_beta_state.1 = planet_state.charged_cells_count;
+                                        planet_beta_state.2 = planet_state.has_rocket;
+                                    }
                                 }
                                 _other => warn!("Wrong message received"),
                             },

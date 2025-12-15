@@ -217,12 +217,17 @@ impl Orchestrator {
         self.planet_handle.remove(&id).unwrap().join()
     }
 
-    pub fn send_to_planet_id(
-        &self,
-        id: u32,
-        msg: OrchestratorToPlanet,
-    ) -> Result<(), SendError<OrchestratorToPlanet>> {
-        self.orch_tx.get(&id).unwrap().send(msg)
+    pub fn send_to_planet_id(&self, id: u32, msg: OrchestratorToPlanet) {
+        info!("Sended an {:?} to planet {id}", &msg);
+        match self.orch_tx.get(&id).unwrap().send(msg) {
+            Ok(()) => {
+                info!("Sended message to planet {id}")
+            }
+            Err(e) => warn!(
+                "an error {:?} occurred while sending message to planet {id}",
+                e
+            ),
+        }
     }
 
     pub fn recv_from_planet_id(
@@ -321,12 +326,8 @@ fn setup(
     orchestrator.add_planet_handle(0, p1_handle);
     orchestrator.add_planet_handle(1, p2_handle);
 
-    orchestrator
-        .send_to_planet_id(0, OrchestratorToPlanet::StartPlanetAI)
-        .expect("Failed to send start messages");
-    orchestrator
-        .send_to_planet_id(1, OrchestratorToPlanet::StartPlanetAI)
-        .expect("Failed to send start messages");
+    orchestrator.send_to_planet_id(0, OrchestratorToPlanet::StartPlanetAI);
+    orchestrator.send_to_planet_id(1, OrchestratorToPlanet::StartPlanetAI);
     match orchestrator
         .recv_from_planet_id(0)
         .expect("No message received")
@@ -346,12 +347,8 @@ fn setup(
         _other => panic!("Failed to start planet"),
     }
 
-    orchestrator
-        .send_to_planet_id(0, OrchestratorToPlanet::InternalStateRequest)
-        .expect("Failed to send start messages");
-    orchestrator
-        .send_to_planet_id(1, OrchestratorToPlanet::InternalStateRequest)
-        .expect("Failed to send start messages");
+    orchestrator.send_to_planet_id(0, OrchestratorToPlanet::InternalStateRequest);
+    orchestrator.send_to_planet_id(1, OrchestratorToPlanet::InternalStateRequest);
     match orchestrator
         .recv_from_planet_id(0)
         .expect("No message received")
@@ -450,7 +447,7 @@ fn yes_button_system(
 
             // Determine target planet
             let target_planet = if explorer_query.translation.x < 0.0 {
-                let _ = orch.send_to_planet_id(
+                orch.send_to_planet_id(
                     0,
                     OrchestratorToPlanet::IncomingExplorerRequest {
                         explorer_id: expl.id(),
@@ -485,7 +482,7 @@ fn yes_button_system(
                 }
                 planet_alpha_entity.single().unwrap()
             } else {
-                let _ = orch.send_to_planet_id(
+                orch.send_to_planet_id(
                     1,
                     OrchestratorToPlanet::IncomingExplorerRequest {
                         explorer_id: expl.id(),
@@ -726,10 +723,7 @@ fn generate_supported_resource_button_system(
                         gen_resource, text.0
                     );
                 }
-                match orch.send_to_planet_id(0, OrchestratorToPlanet::InternalStateRequest) {
-                    Ok(()) => info!("Sended an InternalStateRequest to planet Alpha"),
-                    Err(e) => warn!("Encountered error {e} while sending message"),
-                }
+                orch.send_to_planet_id(0, OrchestratorToPlanet::InternalStateRequest);
 
                 match orch.recv_from_planet_id(0) {
                     Ok(msg) => match msg {
@@ -797,10 +791,7 @@ fn generate_supported_resource_button_system(
                         gen_resource, text.0
                     );
                 }
-                match orch.send_to_planet_id(1, OrchestratorToPlanet::InternalStateRequest) {
-                    Ok(()) => info!("Sended an InternalStateRequest to planet Beta"),
-                    Err(e) => warn!("Encountered error {e} while sending message"),
-                }
+                orch.send_to_planet_id(1, OrchestratorToPlanet::InternalStateRequest);
 
                 match orch.recv_from_planet_id(1) {
                     Ok(msg) => match msg {
