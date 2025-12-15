@@ -164,8 +164,8 @@ impl ExplorerHandler {
 
 #[derive(Resource)]
 pub struct Orchestrator {
-    pub orch_tx: HashMap<u32, Sender<OrchestratorToPlanet>>,
-    pub planet_rx: HashMap<u32, Receiver<PlanetToOrchestrator>>,
+    orch_tx: HashMap<u32, Sender<OrchestratorToPlanet>>,
+    planet_rx: HashMap<u32, Receiver<PlanetToOrchestrator>>,
 }
 
 impl Orchestrator {
@@ -183,6 +183,23 @@ impl Orchestrator {
         self.planet_rx.insert(id, rx);
     }
 
+    pub fn send_to_planet_id(
+        &self,
+        id: u32,
+        msg: OrchestratorToPlanet,
+    ) -> Result<(), SendError<OrchestratorToPlanet>> {
+        self.orch_tx.get(&id).unwrap().send(msg)
+    }
+
+    pub fn recv_from_planet_id(
+        &self,
+        id: u32,
+    ) -> Result<PlanetToOrchestrator, crossbeam_channel::RecvTimeoutError> {
+        self.planet_rx
+            .get(&id)
+            .unwrap()
+            .recv_timeout(std::time::Duration::from_millis(100))
+    }
     /*// Broadcast orchestrator command
     pub fn broadcast(
         &self,
@@ -279,22 +296,13 @@ fn setup(
     });
 
     orchestrator
-        .orch_tx
-        .get(&0)
-        .unwrap()
-        .send(OrchestratorToPlanet::StartPlanetAI)
+        .send_to_planet_id(0, OrchestratorToPlanet::StartPlanetAI)
         .expect("Failed to send start messages");
     orchestrator
-        .orch_tx
-        .get(&1)
-        .unwrap()
-        .send(OrchestratorToPlanet::StartPlanetAI)
+        .send_to_planet_id(1, OrchestratorToPlanet::StartPlanetAI)
         .expect("Failed to send start messages");
     match orchestrator
-        .planet_rx
-        .get(&0)
-        .unwrap()
-        .recv_timeout(std::time::Duration::from_millis(100))
+        .recv_from_planet_id(0)
         .expect("No message received")
     {
         PlanetToOrchestrator::StartPlanetAIResult { planet_id } => {
@@ -303,10 +311,7 @@ fn setup(
         _other => panic!("Failed to start planet"),
     }
     match orchestrator
-        .planet_rx
-        .get(&1)
-        .unwrap()
-        .recv_timeout(std::time::Duration::from_millis(100))
+        .recv_from_planet_id(1)
         .expect("No message received")
     {
         PlanetToOrchestrator::StartPlanetAIResult { planet_id } => {
@@ -316,22 +321,13 @@ fn setup(
     }
 
     orchestrator
-        .orch_tx
-        .get(&0)
-        .unwrap()
-        .send(OrchestratorToPlanet::InternalStateRequest)
+        .send_to_planet_id(0, OrchestratorToPlanet::InternalStateRequest)
         .expect("Failed to send start messages");
     orchestrator
-        .orch_tx
-        .get(&1)
-        .unwrap()
-        .send(OrchestratorToPlanet::InternalStateRequest)
+        .send_to_planet_id(1, OrchestratorToPlanet::InternalStateRequest)
         .expect("Failed to send start messages");
     match orchestrator
-        .planet_rx
-        .get(&0)
-        .unwrap()
-        .recv_timeout(std::time::Duration::from_millis(100))
+        .recv_from_planet_id(0)
         .expect("No message received")
     {
         PlanetToOrchestrator::InternalStateResponse { planet_state, .. } => {
@@ -344,10 +340,7 @@ fn setup(
         _other => panic!("Failed to start planet"),
     }
     match orchestrator
-        .planet_rx
-        .get(&1)
-        .unwrap()
-        .recv_timeout(std::time::Duration::from_millis(100))
+        .recv_from_planet_id(1)
         .expect("No message received")
     {
         PlanetToOrchestrator::InternalStateResponse { planet_state, .. } => {
@@ -431,17 +424,14 @@ fn yes_button_system(
 
             // Determine target planet
             let target_planet = if explorer_query.translation.x < 0.0 {
-                let _ = orch.orch_tx.get(&0).unwrap().send(
+                let _ = orch.send_to_planet_id(
+                    0,
                     OrchestratorToPlanet::IncomingExplorerRequest {
                         explorer_id: expl.id,
                         new_mpsc_sender: expl.planet_tx.clone(),
                     },
                 );
-                let res = orch
-                    .planet_rx
-                    .get(&0)
-                    .unwrap()
-                    .recv_timeout(std::time::Duration::from_millis(100));
+                let res = orch.recv_from_planet_id(0);
 
                 if let Ok(msg) = res {
                     match msg {
@@ -469,17 +459,14 @@ fn yes_button_system(
                 }
                 planet_alpha_entity.single().unwrap()
             } else {
-                let _ = orch.orch_tx.get(&1).unwrap().send(
+                let _ = orch.send_to_planet_id(
+                    1,
                     OrchestratorToPlanet::IncomingExplorerRequest {
                         explorer_id: expl.id,
                         new_mpsc_sender: expl.planet_tx.clone(),
                     },
                 );
-                let res = orch
-                    .planet_rx
-                    .get(&1)
-                    .unwrap()
-                    .recv_timeout(std::time::Duration::from_millis(100));
+                let res = orch.recv_from_planet_id(1);
 
                 if let Ok(msg) = res {
                     match msg {
@@ -719,22 +706,12 @@ fn generate_supported_resource_button_system(
                         gen_resource, text.0
                     );
                 }
-                match orch
-                    .orch_tx
-                    .get(&0)
-                    .unwrap()
-                    .send(OrchestratorToPlanet::InternalStateRequest)
-                {
+                match orch.send_to_planet_id(0, OrchestratorToPlanet::InternalStateRequest) {
                     Ok(()) => info!("Sended an InternalStateRequest to planet Alpha"),
                     Err(e) => warn!("Encountered error {e} while sending message"),
                 }
 
-                match orch
-                    .planet_rx
-                    .get(&0)
-                    .unwrap()
-                    .recv_timeout(std::time::Duration::from_millis(100))
-                {
+                match orch.recv_from_planet_id(0) {
                     Ok(msg) => match msg {
                         PlanetToOrchestrator::InternalStateResponse { planet_state, .. } => {
                             planet_alpha_state.1 = planet_state.charged_cells_count;
@@ -804,22 +781,12 @@ fn generate_supported_resource_button_system(
                         gen_resource, text.0
                     );
                 }
-                match orch
-                    .orch_tx
-                    .get(&1)
-                    .unwrap()
-                    .send(OrchestratorToPlanet::InternalStateRequest)
-                {
+                match orch.send_to_planet_id(1, OrchestratorToPlanet::InternalStateRequest) {
                     Ok(()) => info!("Sended an InternalStateRequest to planet Beta"),
                     Err(e) => warn!("Encountered error {e} while sending message"),
                 }
 
-                match orch
-                    .planet_rx
-                    .get(&1)
-                    .unwrap()
-                    .recv_timeout(std::time::Duration::from_millis(100))
-                {
+                match orch.recv_from_planet_id(1) {
                     Ok(msg) => match msg {
                         PlanetToOrchestrator::InternalStateResponse { planet_state, .. } => {
                             planet_beta_state.1 = planet_state.charged_cells_count;
@@ -921,16 +888,13 @@ fn take_off_button_system(
             commands.entity(*explorer).remove::<Landed>();
             commands.entity(*explorer).insert(Roaming);
             explorer_query.translation.x = if explorer_query.translation.x < 0.0 {
-                let _ = orch.orch_tx.get(&0).unwrap().send(
+                let _ = orch.send_to_planet_id(
+                    0,
                     OrchestratorToPlanet::OutgoingExplorerRequest {
                         explorer_id: expl.id,
                     },
                 );
-                let res = orch
-                    .planet_rx
-                    .get(&0)
-                    .unwrap()
-                    .recv_timeout(std::time::Duration::from_millis(100));
+                let res = orch.recv_from_planet_id(0);
 
                 if let Ok(msg) = res {
                     match msg {
@@ -958,16 +922,13 @@ fn take_off_button_system(
                 }
                 explorer_query.translation.x + 70.0
             } else {
-                let _ = orch.orch_tx.get(&1).unwrap().send(
+                let _ = orch.send_to_planet_id(
+                    1,
                     OrchestratorToPlanet::OutgoingExplorerRequest {
                         explorer_id: expl.id,
                     },
                 );
-                let res = orch
-                    .planet_rx
-                    .get(&1)
-                    .unwrap()
-                    .recv_timeout(std::time::Duration::from_millis(100));
+                let res = orch.recv_from_planet_id(1);
                 if let Ok(msg) = res {
                     match msg {
                         PlanetToOrchestrator::OutgoingExplorerResponse {
