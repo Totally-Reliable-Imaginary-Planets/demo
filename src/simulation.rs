@@ -5,7 +5,6 @@ use common_game::protocols::messages::{
     ExplorerToPlanet, OrchestratorToPlanet, PlanetToExplorer, PlanetToOrchestrator,
 };
 use crossbeam_channel::{Receiver, SendError, Sender, unbounded};
-use std::any::Any;
 use std::collections::HashMap;
 use std::thread::JoinHandle;
 
@@ -15,11 +14,13 @@ use crate::explorer::Roaming;
 use crate::planet::Planet;
 use crate::resources::EventSpawnTimer;
 use crate::resources::PlanetEntities;
+use crate::theme;
 
 use crate::AvailableEnergyCellButton;
 use crate::ExtractResourceButton;
 use crate::GameState;
 use crate::LandedPlanetDialog;
+use crate::LogScreen;
 use crate::LogText;
 use crate::NoButton;
 use crate::PlanetAlphaState;
@@ -65,16 +66,10 @@ pub fn simulation_plugin(app: &mut App) {
                 supported_resource_button_system,
                 available_energy_cell_button_system,
                 generate_supported_resource_button_system,
+                update_planet_beta_ui.run_if(resource_changed::<PlanetBetaStateRes>),
+                update_planet_alpha_ui.run_if(resource_changed::<PlanetAlphaStateRes>),
             )
                 .run_if(in_state(GameState::Playing)),
-        )
-        .add_systems(
-            Update,
-            update_planet_beta_ui.run_if(resource_changed::<PlanetBetaStateRes>),
-        )
-        .add_systems(
-            Update,
-            update_planet_alpha_ui.run_if(resource_changed::<PlanetAlphaStateRes>),
         );
 }
 
@@ -244,14 +239,7 @@ impl Orchestrator {
     }
 }
 
-fn setup(
-    mut commands: Commands,
-    asset_server: Res<AssetServer>,
-    mut dialog_query: Query<
-        &mut Visibility,
-        Or<(With<LogText>, With<PlanetAlphaState>, With<PlanetBetaState>)>,
-    >,
-) {
+fn setup(mut commands: Commands, asset_server: Res<AssetServer>) {
     let (orch_tx_p1, orch_rx_p1) = unbounded();
     let (planet_tx_p1, planet_rx_p1) = unbounded();
     let (expl_tx_p1, expl_rx_p1) = unbounded();
@@ -287,6 +275,7 @@ fn setup(
         trip::trip(1, orch_rx_p2, planet_tx_p2, expl_rx_p2).expect("Error createing planet2");
     let planet2 = commands
         .spawn((
+            DespawnOnExit(GameState::Playing),
             Sprite {
                 image: asset_server.load("sprites/Ice.png"),
                 custom_size: Some(Vec2::new(100.0, 100.0)),
@@ -300,6 +289,7 @@ fn setup(
 
     // Explorer
     commands.spawn((
+        DespawnOnExit(GameState::Playing),
         Sprite {
             image: asset_server.load("sprites/explorer.png"),
             custom_size: Some(Vec2::new(50.0, 50.0)),
@@ -381,37 +371,291 @@ fn setup(
 
     commands.insert_resource(orchestrator);
     commands.insert_resource(explorer_handl);
+    let spacing = 2.0;
+    let padding = 12.0;
 
-    for mut visibility in &mut dialog_query {
-        *visibility = Visibility::Visible;
-    }
+    // Planet states
+    commands.spawn(create_planet_state(
+        &asset_server,
+        "Planet Alpha",
+        Val::Auto,
+        Val::Percent(spacing),
+        Val::Percent(spacing),
+        PlanetAlphaState,
+        PlanetCell,
+        PlanetRocket,
+    ));
+
+    commands.spawn(create_planet_state(
+        &asset_server,
+        "Planet Beta",
+        Val::Percent(spacing),
+        Val::Auto,
+        Val::Percent(spacing),
+        PlanetBetaState,
+        PlanetCell,
+        PlanetRocket,
+    ));
+
+    // Log screen
+    commands.spawn((
+        DespawnOnExit(GameState::Playing),
+        Node {
+            position_type: PositionType::Absolute,
+            bottom: Val::Px(0.0),
+            left: Val::Percent(2.5),
+            width: Val::Percent(95.0),
+            height: Val::Percent(30.0),
+            padding: UiRect::all(Val::Px(padding)),
+            overflow: Overflow::scroll_y(),
+            ..default()
+        },
+        LogScreen,
+        Visibility::Visible,
+        theme::background_color(),
+        children![(
+            Text::new(""),
+            theme::basic_font(&asset_server),
+            theme::text_color(),
+            LogText,
+        )],
+    ));
+
+    commands.spawn((
+        DespawnOnExit(GameState::Playing),
+        Node {
+            flex_direction: FlexDirection::Column,
+            position_type: PositionType::Absolute,
+            justify_content: JustifyContent::SpaceBetween,
+            bottom: Val::Percent(35.0),
+            left: Val::Percent(35.0),
+            width: Val::Percent(30.0),
+            min_width: Val::Px(400.0),
+            height: Val::Percent(60.0),
+            ..default()
+        },
+        LandedPlanetDialog,
+        Visibility::Hidden,
+        theme::background_color(),
+        children![
+            (
+                Text::new("What would you do on this planet?"),
+                theme::title_font(&asset_server),
+                theme::text_color(),
+            ),
+            create_button(
+                &asset_server,
+                "Supported Resource",
+                SupportedResourceButton,
+                Val::Percent(90.0),
+                Val::Percent(15.0),
+                Val::Percent(5.0),
+                Val::Px(5.0),
+                Color::WHITE
+            ),
+            create_button(
+                &asset_server,
+                "Extract Resource",
+                ExtractResourceButton,
+                Val::Percent(90.0),
+                Val::Percent(15.0),
+                Val::Percent(5.0),
+                Val::Px(5.0),
+                Color::WHITE
+            ),
+            create_button(
+                &asset_server,
+                "Available Energy Cell",
+                AvailableEnergyCellButton,
+                Val::Percent(90.0),
+                Val::Percent(15.0),
+                Val::Percent(5.0),
+                Val::Px(5.0),
+                Color::WHITE
+            ),
+            create_button(
+                &asset_server,
+                "Take off",
+                TakeOffPlanetButton,
+                Val::Percent(90.0),
+                Val::Percent(15.0),
+                Val::Percent(5.0),
+                Val::Px(5.0),
+                Color::WHITE
+            ),
+        ],
+    ));
+
+    // Spawn land_on_planet_dialog UI
+    commands.spawn(land_on_planet_dialog(&asset_server));
+}
+
+fn create_planet_state(
+    asset_server: &Res<AssetServer>,
+    planet_name: &str,
+    right: Val,
+    left: Val,
+    top: Val,
+    state: impl Component,
+    cell: impl Component,
+    rocket: impl Component,
+) -> impl Bundle {
+    let padding = 12.0;
+    let width = 10.0;
+    let max_width = width + 5.0;
+    let height = 15.0;
+
+    (
+        DespawnOnExit(GameState::Playing),
+        Node {
+            position_type: PositionType::Absolute,
+            flex_direction: FlexDirection::Column,
+            top: top,
+            right: right,
+            left: left,
+            padding: UiRect::all(Val::Px(padding)),
+            width: Val::Percent(width),
+            max_width: Val::Percent(max_width),
+            height: Val::Percent(height),
+            ..default()
+        },
+        state,
+        Visibility::Visible,
+        theme::background_color(),
+        children![
+            (
+                Text::new(planet_name),
+                theme::title_font(asset_server),
+                theme::text_color(),
+            ),
+            (
+                Text::new("Energy cell:"),
+                theme::basic_font(asset_server),
+                theme::text_color(),
+            ),
+            (
+                Text::new(""),
+                theme::basic_font(asset_server),
+                theme::text_color(),
+                cell
+            ),
+            (
+                Text::new("Rocket:"),
+                theme::basic_font(asset_server),
+                theme::text_color(),
+            ),
+            (
+                Text::new(""),
+                theme::basic_font(asset_server),
+                theme::text_color(),
+                rocket,
+            )
+        ],
+    )
+}
+
+fn land_on_planet_dialog(asset_server: &Res<AssetServer>) -> impl Bundle {
+    (
+        Node {
+            position_type: PositionType::Absolute,
+            bottom: Val::Percent(30.0),
+            left: Val::Percent(30.0),
+            width: Val::Percent(40.0),
+            height: Val::Percent(40.0),
+            ..default()
+        },
+        Visibility::Hidden,
+        theme::background_color(),
+        PlanetDialog,
+        children![(
+            Node {
+                flex_direction: FlexDirection::Column,
+                padding: UiRect::all(Val::Px(20.0)),
+
+                justify_content: JustifyContent::SpaceBetween,
+                ..default()
+            },
+            children![
+                (
+                    Text::new("You have reached a planet do you want to land on it?"),
+                    theme::title_font(asset_server),
+                    theme::text_color(),
+                ),
+                (
+                    Node {
+                        flex_direction: FlexDirection::Row,
+                        justify_content: JustifyContent::SpaceBetween,
+                        ..default()
+                    },
+                    children![
+                        create_button(
+                            &asset_server,
+                            "Yes",
+                            YesButton,
+                            Val::Percent(40.0),
+                            Val::Percent(100.0),
+                            Val::Auto,
+                            Val::Px(5.0),
+                            Color::WHITE
+                        ),
+                        create_button(
+                            &asset_server,
+                            "No",
+                            NoButton,
+                            Val::Percent(40.0),
+                            Val::Percent(100.0),
+                            Val::Auto,
+                            Val::Px(5.0),
+                            Color::WHITE
+                        ),
+                    ],
+                )
+            ],
+        )],
+    )
+}
+
+fn create_button(
+    asset_server: &Res<AssetServer>,
+    text: &str,
+    button_component: impl Component,
+    width: Val,
+    height: Val,
+    left: Val,
+    border_stroke: Val,
+    border_color: Color,
+) -> impl Bundle {
+    (
+        Button,
+        button_component,
+        Node {
+            width: width,
+            height: height,
+            left: left,
+            border: UiRect::all(border_stroke),
+            // horizontally center child text
+            justify_content: JustifyContent::Center,
+            // vertically center child text
+            align_items: AlignItems::Center,
+            ..default()
+        },
+        BorderColor::all(border_color),
+        children![(
+            Text::new(text),
+            theme::title_font(asset_server),
+            theme::text_color(),
+        )],
+    )
 }
 
 fn check_entities_and_end_game(
-    mut commands: Commands,
     planet: Query<&Planet>,
     explorer: Query<&Planet>,
     mut next_state: ResMut<NextState<GameState>>,
-    query: Query<Entity, Or<(With<Explorer>, With<Planet>)>>,
-    mut log_query: Query<&mut Text, With<LogText>>,
-    mut dialog_query: Query<
-        &mut Visibility,
-        Or<(With<LogText>, With<PlanetAlphaState>, With<PlanetBetaState>)>,
-    >,
 ) {
     if planet.is_empty() || explorer.is_empty() {
-        for mut visibility in &mut dialog_query {
-            *visibility = Visibility::Hidden;
-        }
-        for entity in &query {
-            commands.entity(entity).despawn();
-        }
         // No player entity found → end game
         next_state.set(GameState::Settings);
-        // Update UI text instead of printing
-        if let Ok(mut text) = log_query.single_mut() {
-            text.0 = String::new();
-        }
     }
 }
 

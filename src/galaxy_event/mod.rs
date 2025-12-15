@@ -209,7 +209,7 @@ pub fn event_handler_system(
         {
             let log_message = match event {
                 GalaxyEvent::Sunray => {
-                    let planet_id = if planet.name() == "Alpha" { 0 } else { 0 };
+                    let planet_id = if planet.name() == "Alpha" { 0 } else { 1 };
                     let res = {
                         orch.send_to_planet_id(
                             planet_id,
