@@ -64,13 +64,20 @@ pub fn event_spawner_system(
                     1 => {
                         let res = if planet.name() == "Alpha" {
                             let _ = orch
-                                .broadcast(OrchestratorToPlanet::Asteroid(Asteroid::default()), 0);
+                                .orch_tx
+                                .get(&0)
+                                .unwrap()
+                                .send(OrchestratorToPlanet::Asteroid(Asteroid::default()));
                             let res = orch
-                                .planet_rx_p1
+                                .planet_rx
+                                .get(&0)
+                                .unwrap()
                                 .recv_timeout(std::time::Duration::from_millis(100));
 
                             match orch
-                                .orch_tx_p1
+                                .orch_tx
+                                .get(&0)
+                                .unwrap()
                                 .send(OrchestratorToPlanet::InternalStateRequest)
                             {
                                 Ok(()) => info!("Sended an InternalStateRequest to planet Alpha"),
@@ -78,7 +85,9 @@ pub fn event_spawner_system(
                             }
 
                             match orch
-                                .planet_rx_p1
+                                .planet_rx
+                                .get(&0)
+                                .unwrap()
                                 .recv_timeout(std::time::Duration::from_millis(100))
                             {
                                 Ok(msg) => match msg {
@@ -100,13 +109,20 @@ pub fn event_spawner_system(
                             res
                         } else {
                             let _ = orch
-                                .broadcast(OrchestratorToPlanet::Asteroid(Asteroid::default()), 1);
+                                .orch_tx
+                                .get(&1)
+                                .unwrap()
+                                .send(OrchestratorToPlanet::Asteroid(Asteroid::default()));
                             let res = orch
-                                .planet_rx_p2
+                                .planet_rx
+                                .get(&1)
+                                .unwrap()
                                 .recv_timeout(std::time::Duration::from_millis(100));
 
                             match orch
-                                .orch_tx_p2
+                                .orch_tx
+                                .get(&1)
+                                .unwrap()
                                 .send(OrchestratorToPlanet::InternalStateRequest)
                             {
                                 Ok(()) => info!("Sended an InternalStateRequest to planet Beta"),
@@ -114,7 +130,9 @@ pub fn event_spawner_system(
                             }
 
                             match orch
-                                .planet_rx_p2
+                                .planet_rx
+                                .get(&1)
+                                .unwrap()
                                 .recv_timeout(std::time::Duration::from_millis(100))
                             {
                                 Ok(msg) => match msg {
@@ -229,13 +247,21 @@ pub fn event_handler_system(
             let log_message = match event {
                 GalaxyEvent::Sunray => {
                     let res = if planet.name() == "Alpha" {
-                        let _ = orch.broadcast(OrchestratorToPlanet::Sunray(Sunray::default()), 0);
+                        let _ = orch
+                            .orch_tx
+                            .get(&0)
+                            .unwrap()
+                            .send(OrchestratorToPlanet::Sunray(Sunray::default()));
                         let res = orch
-                            .planet_rx_p1
+                            .planet_rx
+                            .get(&0)
+                            .unwrap()
                             .recv_timeout(std::time::Duration::from_millis(100));
 
                         match orch
-                            .orch_tx_p1
+                            .orch_tx
+                            .get(&0)
+                            .unwrap()
                             .send(OrchestratorToPlanet::InternalStateRequest)
                         {
                             Ok(()) => info!("Sended an InternalStateRequest to planet Alpha"),
@@ -243,7 +269,9 @@ pub fn event_handler_system(
                         }
 
                         match orch
-                            .planet_rx_p1
+                            .planet_rx
+                            .get(&0)
+                            .unwrap()
                             .recv_timeout(std::time::Duration::from_millis(100))
                         {
                             Ok(msg) => match msg {
@@ -264,13 +292,21 @@ pub fn event_handler_system(
                         }
                         res
                     } else {
-                        let _ = orch.broadcast(OrchestratorToPlanet::Sunray(Sunray::default()), 1);
+                        let _ = orch
+                            .orch_tx
+                            .get(&1)
+                            .unwrap()
+                            .send(OrchestratorToPlanet::Sunray(Sunray::default()));
                         let res = orch
-                            .planet_rx_p2
+                            .planet_rx
+                            .get(&1)
+                            .unwrap()
                             .recv_timeout(std::time::Duration::from_millis(100));
 
                         match orch
-                            .orch_tx_p2
+                            .orch_tx
+                            .get(&1)
+                            .unwrap()
                             .send(OrchestratorToPlanet::InternalStateRequest)
                         {
                             Ok(()) => info!("Sended an InternalStateRequest to planet Beta"),
@@ -278,7 +314,9 @@ pub fn event_handler_system(
                         }
 
                         match orch
-                            .planet_rx_p2
+                            .planet_rx
+                            .get(&1)
+                            .unwrap()
                             .recv_timeout(std::time::Duration::from_millis(100))
                         {
                             Ok(msg) => match msg {

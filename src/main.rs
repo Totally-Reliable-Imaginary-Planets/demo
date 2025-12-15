@@ -37,9 +37,9 @@ pub struct LogText;
 #[derive(Component)]
 pub struct PlanetAlphaState;
 #[derive(Component)]
-pub struct PlanetAlphaCell;
+pub struct PlanetCell;
 #[derive(Component)]
-pub struct PlanetAlphaRocket;
+pub struct PlanetRocket;
 #[derive(Component)]
 pub struct PlanetBetaState;
 #[derive(Component)]
@@ -90,8 +90,8 @@ fn setup(mut commands: Commands, asset_server: Res<AssetServer>) {
         Val::Percent(spacing),
         Val::Percent(spacing),
         PlanetAlphaState,
-        PlanetAlphaCell,
-        PlanetAlphaRocket,
+        PlanetCell,
+        PlanetRocket,
     ));
 
     commands.spawn(create_planet_state(
@@ -101,8 +101,8 @@ fn setup(mut commands: Commands, asset_server: Res<AssetServer>) {
         Val::Auto,
         Val::Percent(spacing),
         PlanetBetaState,
-        PlanetBetaCell,
-        PlanetBetaRocket,
+        PlanetCell,
+        PlanetRocket,
     ));
 
     // Log screen
