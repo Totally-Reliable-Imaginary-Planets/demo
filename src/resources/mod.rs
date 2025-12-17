@@ -2,7 +2,7 @@ use bevy::prelude::Entity;
 use bevy::prelude::Resource;
 use bevy::prelude::Timer;
 
-#[derive(Resource)]
+#[derive(Resource, Default)]
 pub struct EventSpawnTimer(pub(crate) Timer);
 
 #[derive(Resource)]

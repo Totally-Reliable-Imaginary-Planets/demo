@@ -5,7 +5,7 @@ mod orchestrator;
 mod planet;
 mod resources;
 mod settings;
-mod simulation;
+//mod simulation;
 mod simulation_better;
 mod theme;
 
