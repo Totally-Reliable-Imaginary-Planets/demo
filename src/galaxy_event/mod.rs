@@ -12,6 +12,9 @@ use crate::Planet;
 use crate::PlanetEntities;
 use crate::simulation::PlanetAlphaStateRes;
 use crate::simulation::PlanetBetaStateRes;
+use crate::simulation::PlanetState;
+use crate::simulation::PlanetStates;
+use crate::simulation::PlanetToUpdate;
 
 #[derive(Component)]
 pub enum GalaxyEvent {
@@ -39,6 +42,8 @@ pub fn event_spawner_system(
     mut orch: ResMut<Orchestrator>,
     mut planet_alpha_state: ResMut<PlanetAlphaStateRes>,
     mut planet_beta_state: ResMut<PlanetBetaStateRes>,
+    mut planet_states: ResMut<PlanetStates>,
+    mut planet_to_update: ResMut<PlanetToUpdate>,
 ) {
     if timer.0.tick(time.delta()).just_finished() {
         // Don't spawn if there's already an active event
@@ -81,6 +86,15 @@ pub fn event_spawner_system(
                                         planet_state,
                                         ..
                                     } => {
+                                        planet_states.insert(
+                                            planet_id,
+                                            PlanetState {
+                                                num_cell: planet_state.energy_cells.len(),
+                                                charged_cell: planet_state.charged_cells_count,
+                                                has_rocket: planet_state.has_rocket,
+                                            },
+                                        );
+                                        planet_to_update.0 = planet_id;
                                         if planet_id == 0 {
                                             planet_alpha_state.1 = planet_state.charged_cells_count;
                                             planet_alpha_state.2 = planet_state.has_rocket;
@@ -200,6 +214,8 @@ pub fn event_handler_system(
     orch: Res<Orchestrator>,
     mut planet_alpha_state: ResMut<PlanetAlphaStateRes>,
     mut planet_beta_state: ResMut<PlanetBetaStateRes>,
+    mut planet_states: ResMut<PlanetStates>,
+    mut planet_to_update: ResMut<PlanetToUpdate>,
 ) {
     for (event, mut target) in &mut event_query {
         target.duration.tick(time.delta());
@@ -228,6 +244,15 @@ pub fn event_handler_system(
                                     planet_state,
                                     ..
                                 } => {
+                                    planet_states.insert(
+                                        planet_id,
+                                        PlanetState {
+                                            num_cell: planet_state.energy_cells.len(),
+                                            charged_cell: planet_state.charged_cells_count,
+                                            has_rocket: planet_state.has_rocket,
+                                        },
+                                    );
+                                    planet_to_update.0 = planet_id;
                                     if planet_id == 0 {
                                         planet_alpha_state.1 = planet_state.charged_cells_count;
                                         planet_alpha_state.2 = planet_state.has_rocket;

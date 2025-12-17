@@ -32,23 +32,38 @@ use crate::SupportedResourceButton;
 use crate::TakeOffPlanetButton;
 use crate::YesButton;
 
-#[derive(Resource)]
+#[derive(Resource, Default)]
 pub struct PlanetAlphaStateRes(pub usize, pub usize, pub bool);
-#[derive(Resource)]
+#[derive(Resource, Default)]
 pub struct PlanetBetaStateRes(pub usize, pub usize, pub bool);
 #[derive(Resource, Default)]
+pub struct PlanetToUpdate(pub u32);
+#[derive(Resource, Default)]
 pub struct PlanetStates {
-    inner: HashMap<PlanetId, PlanetState>,
+    inner: HashMap<u32, PlanetState>,
 }
-pub struct PlanetState(pub usize, pub usize, pub bool);
-#[derive(Hash, PartialEq, Eq, Clone)]
-enum PlanetId {
-    Alpha,
-    Beta,
+impl PlanetStates {
+    pub fn insert(&mut self, id: u32, state: PlanetState) {
+        self.inner.insert(id, state);
+    }
+
+    pub fn get(&self, id: u32) -> Option<&PlanetState> {
+        self.inner.get(&id)
+    }
+}
+#[derive(Debug, Default)]
+pub struct PlanetState {
+    pub num_cell: usize,
+    pub charged_cell: usize,
+    pub has_rocket: bool,
 }
 
 pub fn simulation_plugin(app: &mut App) {
-    app.add_systems(OnEnter(GameState::Playing), setup)
+    app.init_resource::<PlanetBetaStateRes>()
+        .init_resource::<PlanetAlphaStateRes>()
+        .init_resource::<PlanetStates>()
+        .init_resource::<PlanetToUpdate>()
+        .add_systems(OnEnter(GameState::Playing), setup)
         .add_systems(
             Update,
             (
@@ -66,6 +81,7 @@ pub fn simulation_plugin(app: &mut App) {
                 supported_resource_button_system,
                 available_energy_cell_button_system,
                 generate_supported_resource_button_system,
+                //update_planet_state_ui.run_if(resource_changed::<PlanetToUpdate>),
                 update_planet_beta_ui.run_if(resource_changed::<PlanetBetaStateRes>),
                 update_planet_alpha_ui.run_if(resource_changed::<PlanetAlphaStateRes>),
             )
@@ -134,6 +150,8 @@ fn update_planet_beta_ui(
 struct PlanetAlpha;
 #[derive(Component)]
 struct PlanetBeta;
+#[derive(Debug, Component)]
+struct PlanetId(pub u32);
 
 #[derive(Resource)]
 pub struct ExplorerHandler {
@@ -262,6 +280,7 @@ fn setup(mut commands: Commands, asset_server: Res<AssetServer>) {
             Transform::from_xyz(-400.0, 0.0, 0.0),
             Planet::new("Alpha", Vec2::new(-400.0, 0.0)),
             PlanetAlpha,
+            PlanetId(0),
         ))
         .id();
 
@@ -284,6 +303,7 @@ fn setup(mut commands: Commands, asset_server: Res<AssetServer>) {
             Transform::from_xyz(400.0, 0.0, 0.0),
             Planet::new("Beta", Vec2::new(400.0, 0.0)),
             PlanetBeta,
+            PlanetId(1),
         ))
         .id();
 
@@ -340,34 +360,27 @@ fn setup(mut commands: Commands, asset_server: Res<AssetServer>) {
         _other => panic!("Failed to start planet"),
     }
 
-    orchestrator.send_to_planet_id(0, OrchestratorToPlanet::InternalStateRequest);
-    orchestrator.send_to_planet_id(1, OrchestratorToPlanet::InternalStateRequest);
-    match orchestrator
-        .recv_from_planet_id(0)
-        .expect("No message received")
-    {
-        PlanetToOrchestrator::InternalStateResponse { planet_state, .. } => {
-            commands.insert_resource(PlanetAlphaStateRes(
-                planet_state.energy_cells.len(),
-                planet_state.charged_cells_count,
-                planet_state.has_rocket,
-            ));
+    let mut planet_states = PlanetStates::default();
+    for i in 0..2 {
+        orchestrator.send_to_planet_id(i, OrchestratorToPlanet::InternalStateRequest);
+        match orchestrator
+            .recv_from_planet_id(i)
+            .expect("No message received")
+        {
+            PlanetToOrchestrator::InternalStateResponse { planet_state, .. } => {
+                planet_states.insert(
+                    i,
+                    PlanetState {
+                        num_cell: planet_state.energy_cells.len(),
+                        charged_cell: planet_state.charged_cells_count,
+                        has_rocket: planet_state.has_rocket,
+                    },
+                );
+            }
+            _other => panic!("Failed to start planet"),
         }
-        _other => panic!("Failed to start planet"),
     }
-    match orchestrator
-        .recv_from_planet_id(1)
-        .expect("No message received")
-    {
-        PlanetToOrchestrator::InternalStateResponse { planet_state, .. } => {
-            commands.insert_resource(PlanetBetaStateRes(
-                planet_state.energy_cells.len(),
-                planet_state.charged_cells_count,
-                planet_state.has_rocket,
-            ));
-        }
-        _other => panic!("Failed to start planet"),
-    }
+    commands.insert_resource(planet_states);
 
     commands.insert_resource(orchestrator);
     commands.insert_resource(explorer_handl);

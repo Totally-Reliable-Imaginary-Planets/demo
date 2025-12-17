@@ -1,10 +1,12 @@
 use bevy::prelude::*;
 mod explorer;
 mod galaxy_event;
+mod orchestrator;
 mod planet;
 mod resources;
 mod settings;
 mod simulation;
+mod simulation_better;
 mod theme;
 
 use crate::explorer::Explorer;
@@ -17,7 +19,10 @@ fn main() {
         .add_plugins(DefaultPlugins)
         .init_state::<GameState>()
         .add_systems(Startup, setup)
-        .add_plugins((settings::settings_plugin, simulation::simulation_plugin))
+        .add_plugins((
+            settings::settings_plugin,
+            simulation_better::simulation_better_plugin,
+        ))
         .run();
 }
 
@@ -25,8 +30,8 @@ fn main() {
 #[derive(Clone, Copy, Default, Eq, PartialEq, Debug, Hash, States)]
 enum GameState {
     #[default]
-    Playing,
     Settings,
+    Playing,
 }
 
 #[derive(Component)]
