@@ -42,7 +42,7 @@ pub fn event_spawner_system(
     mut cell_query: Query<&mut PlanetCell>,
     mut rocket_query: Query<&mut PlanetRocket>,
     //mut log_query: Query<&mut Text, With<LogText>>,
-    //mut orch: ResMut<Orchestrator>,
+    mut orch: ResMut<Orchestrator>,
 ) {
     if timer.0.tick(time.delta()).just_finished() {
         // Don't spawn if there's already an active event
@@ -51,7 +51,7 @@ pub fn event_spawner_system(
 
             // Choose random planet
             let planet_idx = rng.random_range(0..planet_query.count());
-            if let Some((target, name, _id)) = planet_query.iter().nth(planet_idx) {
+            if let Some((target, name, id)) = planet_query.iter().nth(planet_idx) {
                 // Choose random event (33% each: Sunray, Asteroid, Nothing)
                 let (entity, ui) = ui_query.iter().find(|&(_, ui)| ui.0 == target).unwrap();
                 let children = children_query.get(entity).unwrap();
@@ -64,52 +64,36 @@ pub fn event_spawner_system(
                                 duration: Timer::from_seconds(3.0, TimerMode::Once),
                             },
                         ));
-
-                        for child in children.iter() {
-                            if let Ok(mut cell) = cell_query.get_mut(child) {
-                                if cell.charged_cell < cell.num_cell {
-                                    cell.charged_cell += 1;
-                                }
-                            }
-                            if let Ok(mut rocket) = rocket_query.get_mut(child) {}
-                        }
                         format!(" Sunray approaching planet {}!", name.0)
                     }
                     1 => {
-                        /*let planet_id = if planet.name() == "Alpha" { 0 } else { 1 };
                         let res = {
                             orch.send_to_planet_id(
-                                planet_id,
+                                id.0,
                                 OrchestratorToPlanet::Asteroid(Asteroid::default()),
                             );
-                            let res = orch.recv_from_planet_id(planet_id);
+                            let res = orch.recv_from_planet_id(id.0);
 
                             orch.send_to_planet_id(
-                                planet_id,
+                                id.0,
                                 OrchestratorToPlanet::InternalStateRequest,
                             );
 
-                            match orch.recv_from_planet_id(planet_id) {
+                            match orch.recv_from_planet_id(id.0) {
                                 Ok(msg) => match msg {
                                     PlanetToOrchestrator::InternalStateResponse {
                                         planet_state,
                                         ..
                                     } => {
-                                        planet_states.insert(
-                                            planet_id,
-                                            PlanetState {
-                                                num_cell: planet_state.energy_cells.len(),
-                                                charged_cell: planet_state.charged_cells_count,
-                                                has_rocket: planet_state.has_rocket,
-                                            },
-                                        );
-                                        planet_to_update.0 = planet_id;
-                                        if planet_id == 0 {
-                                            planet_alpha_state.1 = planet_state.charged_cells_count;
-                                            planet_alpha_state.2 = planet_state.has_rocket;
-                                        } else {
-                                            planet_beta_state.1 = planet_state.charged_cells_count;
-                                            planet_beta_state.2 = planet_state.has_rocket;
+                                        for child in children.iter() {
+                                            if let Ok(mut cell) = cell_query.get_mut(child) {
+                                                cell.num_cell = planet_state.energy_cells.len();
+                                                cell.charged_cell =
+                                                    planet_state.charged_cells_count;
+                                            }
+                                            if let Ok(mut rocket) = rocket_query.get_mut(child) {
+                                                rocket.0 = planet_state.has_rocket;
+                                            }
                                         }
                                     }
                                     _other => warn!("Wrong message received"),
@@ -128,19 +112,18 @@ pub fn event_spawner_system(
                                     commands.spawn((
                                         GalaxyEvent::Asteroid,
                                         EventTarget {
-                                            planet: target_planet,
+                                            planet: target,
                                             duration: Timer::from_seconds(3.0, TimerMode::Once),
                                         },
                                     ));
-                                    orch.send_to_planet_id(
-                                        planet_id,
-                                        OrchestratorToPlanet::KillPlanet,
-                                    );
-                                    match orch.recv_from_planet_id(planet_id) {
+                                    orch.send_to_planet_id(id.0, OrchestratorToPlanet::KillPlanet);
+                                    match orch.recv_from_planet_id(id.0) {
                                         Ok(msg) => match msg {
                                             PlanetToOrchestrator::KillPlanetResult {
                                                 planet_id,
-                                            } => info!("planet {planet_id} kiled successfully"),
+                                            } => {
+                                                info!("planet {planet_id} kiled successfully")
+                                            }
                                             _other => warn!("Wrong message received"),
                                         },
                                         Err(e) => {
@@ -149,32 +132,32 @@ pub fn event_spawner_system(
                                             );
                                         }
                                     }
-                                    orch.join_planet_id(planet_id);
-                                    format!(" Asteroid approaching planet {}!", planet.name())
+                                    orch.join_planet_id(id.0);
+                                    format!(" Asteroid approaching planet {}!", name.0)
                                 }
                                 PlanetToOrchestrator::AsteroidAck {
                                     rocket: Some(_), ..
                                 } => {
                                     format!(
                                         " Asteroid approaching planet {} Was destroyed by a rocket 󱎯",
-                                        planet.name()
+                                        name.0
                                     )
                                 }
                                 _other => "Wrong message received".to_string(),
                             },
                             Err(e) => format!("Error {e}"),
-                        }*/
+                        } /*
                         commands.spawn((
-                            GalaxyEvent::Asteroid,
-                            EventTarget {
-                                planet: target,
-                                duration: Timer::from_seconds(3.0, TimerMode::Once),
-                            },
+                        GalaxyEvent::Asteroid,
+                        EventTarget {
+                        planet: target,
+                        duration: Timer::from_seconds(3.0, TimerMode::Once),
+                        },
                         ));
                         format!(
-                            " Asteroid approaching planet {} Was destroyed by a rocket 󱎯",
-                            name.0
-                        )
+                        " Asteroid approaching planet {} Was destroyed by a rocket 󱎯",
+                        name.0
+                        )*/
                     }
                     _ => "󰒲 Nothing happening this cycle.".to_string(),
                 };
@@ -235,8 +218,12 @@ pub fn event_handler_system(
     time: Res<Time>,
     mut event_query: Query<(&GalaxyEvent, &mut EventTarget)>,
     planet_query: Query<(&PlanetName, &PlanetId), With<Planet>>,
+    ui_query: Query<(Entity, &PlanetUi)>,
+    children_query: Query<&Children, With<PlanetUi>>,
+    mut cell_query: Query<&mut PlanetCell>,
+    mut rocket_query: Query<&mut PlanetRocket>,
     //mut log_query: Query<&mut Text, With<LogText>>,
-    //orch: Res<Orchestrator>,
+    orch: Res<Orchestrator>,
 ) {
     for (event, mut target) in &mut event_query {
         target.duration.tick(time.delta());
@@ -244,41 +231,36 @@ pub fn event_handler_system(
         if target.duration.just_finished()
             && let Ok((name, id)) = planet_query.get(target.planet)
         {
+            let (entity, ui) = ui_query
+                .iter()
+                .find(|&(_, ui)| ui.0 == target.planet)
+                .unwrap();
+            let children = children_query.get(entity).unwrap();
             let log_message = match event {
                 GalaxyEvent::Sunray => {
-                    /*let res = {
+                    let res = {
                         orch.send_to_planet_id(
-                            planet_id,
+                            id.0,
                             OrchestratorToPlanet::Sunray(Sunray::default()),
                         );
-                        let res = orch.recv_from_planet_id(planet_id);
+                        let res = orch.recv_from_planet_id(id.0);
 
-                        orch.send_to_planet_id(
-                            planet_id,
-                            OrchestratorToPlanet::InternalStateRequest,
-                        );
+                        orch.send_to_planet_id(id.0, OrchestratorToPlanet::InternalStateRequest);
 
-                        match orch.recv_from_planet_id(planet_id) {
+                        match orch.recv_from_planet_id(id.0) {
                             Ok(msg) => match msg {
                                 PlanetToOrchestrator::InternalStateResponse {
                                     planet_state,
                                     ..
                                 } => {
-                                    planet_states.insert(
-                                        planet_id,
-                                        PlanetState {
-                                            num_cell: planet_state.energy_cells.len(),
-                                            charged_cell: planet_state.charged_cells_count,
-                                            has_rocket: planet_state.has_rocket,
-                                        },
-                                    );
-                                    planet_to_update.0 = planet_id;
-                                    if planet_id == 0 {
-                                        planet_alpha_state.1 = planet_state.charged_cells_count;
-                                        planet_alpha_state.2 = planet_state.has_rocket;
-                                    } else {
-                                        planet_beta_state.1 = planet_state.charged_cells_count;
-                                        planet_beta_state.2 = planet_state.has_rocket;
+                                    for child in children.iter() {
+                                        if let Ok(mut cell) = cell_query.get_mut(child) {
+                                            cell.num_cell = planet_state.energy_cells.len();
+                                            cell.charged_cell = planet_state.charged_cells_count;
+                                        }
+                                        if let Ok(mut rocket) = rocket_query.get_mut(child) {
+                                            rocket.0 = planet_state.has_rocket;
+                                        }
                                     }
                                 }
                                 _other => warn!("Wrong message received"),
@@ -300,11 +282,11 @@ pub fn event_handler_system(
                             _other => warn!("Wrong message received"),
                         },
                         Err(e) => warn!("Error {e}"),
-                    }*/
+                    }
                     format!("󰂄 Sunray hit {}! Energy increased.", name.0)
                 }
                 GalaxyEvent::Asteroid => {
-                    //commands.entity(target.planet).despawn();
+                    commands.entity(target.planet).despawn();
                     format!("󰈸 Asteroid hit {}! Planet destroyed.", name.0)
                 }
             };
