@@ -37,6 +37,10 @@ pub fn event_spawner_system(
     mut timer: ResMut<EventSpawnTimer>,
     existing_events: Query<&EventTarget>,
     planet_query: Query<(Entity, &PlanetName, &PlanetId), With<Planet>>,
+    ui_query: Query<(Entity, &PlanetUi)>,
+    children_query: Query<&Children, With<PlanetUi>>,
+    mut cell_query: Query<&mut PlanetCell>,
+    mut rocket_query: Query<&mut PlanetRocket>,
     //mut log_query: Query<&mut Text, With<LogText>>,
     //mut orch: ResMut<Orchestrator>,
 ) {
@@ -47,8 +51,10 @@ pub fn event_spawner_system(
 
             // Choose random planet
             let planet_idx = rng.random_range(0..planet_query.count());
-            if let Some((target, name, id)) = planet_query.iter().nth(planet_idx) {
+            if let Some((target, name, _id)) = planet_query.iter().nth(planet_idx) {
                 // Choose random event (33% each: Sunray, Asteroid, Nothing)
+                let (entity, ui) = ui_query.iter().find(|&(_, ui)| ui.0 == target).unwrap();
+                let children = children_query.get(entity).unwrap();
                 let log_message = match rng.random_range(0..3) {
                     0 => {
                         commands.spawn((
@@ -58,6 +64,15 @@ pub fn event_spawner_system(
                                 duration: Timer::from_seconds(3.0, TimerMode::Once),
                             },
                         ));
+
+                        for child in children.iter() {
+                            if let Ok(mut cell) = cell_query.get_mut(child) {
+                                if cell.charged_cell < cell.num_cell {
+                                    cell.charged_cell += 1;
+                                }
+                            }
+                            if let Ok(mut rocket) = rocket_query.get_mut(child) {}
+                        }
                         format!(" Sunray approaching planet {}!", name.0)
                     }
                     1 => {

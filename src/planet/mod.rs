@@ -66,7 +66,7 @@ pub fn planet_state(
     planet_name: &str,
     planet: Entity,
     cell: PlanetCell,
-    rocket: impl Component,
+    rocket: PlanetRocket,
 ) -> impl Bundle {
     let padding = 12.0;
     let width = 90.0;

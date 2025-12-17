@@ -9,6 +9,8 @@ pub fn simulation_better_plugin(app: &mut App) {
         .add_systems(
             Update,
             (
+                update_planet_cell,
+                update_planet_rocket,
                 crate::galaxy_event::event_spawner_system,
                 crate::galaxy_event::event_handler_system,
                 crate::galaxy_event::cleanup_events_system,
@@ -25,6 +27,15 @@ pub fn setup(mut commands: Commands, asset_server: Res<AssetServer>) {
             "Alpha",
             Vec3::new(400.0, 0.0, 0.0),
             asset_server.load("sprites/Ice.png"),
+        ))
+        .id();
+
+    let planet2 = commands
+        .spawn(planet(
+            0,
+            "Beta",
+            Vec3::new(0.0, 0.0, 0.0),
+            asset_server.load("sprites/Terran.png"),
         ))
         .id();
 
@@ -48,7 +59,17 @@ pub fn setup(mut commands: Commands, asset_server: Res<AssetServer>) {
                     charged_cell: 0,
                 },
                 PlanetRocket(false),
-            ))
+            )),
+            (planet_state(
+                &asset_server,
+                "Beta",
+                planet2,
+                PlanetCell {
+                    num_cell: 5,
+                    charged_cell: 0,
+                },
+                PlanetRocket(false),
+            )),
         ],
     ));
 
@@ -56,4 +77,19 @@ pub fn setup(mut commands: Commands, asset_server: Res<AssetServer>) {
         5.0,
         TimerMode::Repeating,
     )));
+}
+
+fn update_planet_cell(mut query: Query<(&mut Text, &PlanetCell), Changed<PlanetCell>>) {
+    for (mut text, cell) in query.iter_mut() {
+        text.0 = cell_string(cell);
+    }
+}
+fn update_planet_rocket(mut query: Query<(&mut Text, &PlanetRocket), Changed<PlanetRocket>>) {
+    for (mut text, rocket) in query.iter_mut() {
+        if rocket.0 {
+            text.0 = "󱎯".to_string();
+        } else {
+            text.0 = String::new();
+        }
+    }
 }
