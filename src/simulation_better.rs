@@ -51,7 +51,7 @@ pub fn setup(mut commands: Commands, asset_server: Res<AssetServer>) {
         trip::trip(1, orch_rx_p2, planet_tx_p2, expl_rx_p2).expect("Error creating planet1");
     let planet2 = commands
         .spawn(planet(
-            0,
+            1,
             "Beta",
             Vec3::new(0.0, 0.0, 0.0),
             asset_server.load("sprites/Terran.png"),

@@ -3,32 +3,10 @@ use crate::theme;
 use bevy::prelude::*;
 
 #[derive(Component)]
-pub struct Planet; /*{
-name: String,
-position: Vec2,
-}*/
+pub struct Planet;
 
-/*impl Planet {
-    pub fn new(name: &str, position: Vec2) -> Self {
-        Self {
-            name: name.to_string(),
-            position,
-        }
-    }
-
-    pub fn name(&self) -> String {
-        String::from(&self.name)
-    }
-
-    pub fn position(&self) -> &Vec2 {
-        &self.position
-    }
-}*/
-
-#[derive(Component)]
+#[derive(Component, Debug)]
 pub struct PlanetId(pub u32);
-#[derive(Component)]
-pub struct PlanetName(pub String);
 #[derive(Component)]
 pub struct PlanetUi(pub Entity);
 #[derive(Component)]
@@ -54,7 +32,7 @@ pub fn planet(id: u32, name: &str, position: Vec3, image: Handle<Image>) -> impl
             custom_size: Some(Vec2::new(100.0, 100.0)),
             ..default()
         },
-        PlanetName(name.to_string()),
+        Name::new(name.to_string()),
         Transform::from_translation(position),
         PlanetId(id),
         Planet,

@@ -36,7 +36,7 @@ pub fn event_spawner_system(
     time: Res<Time>,
     mut timer: ResMut<EventSpawnTimer>,
     existing_events: Query<&EventTarget>,
-    planet_query: Query<(Entity, &PlanetName, &PlanetId), With<Planet>>,
+    planet_query: Query<(Entity, &Name, &PlanetId), With<Planet>>,
     ui_query: Query<(Entity, &PlanetUi)>,
     children_query: Query<&Children, With<PlanetUi>>,
     mut cell_query: Query<&mut PlanetCell>,
@@ -44,132 +44,114 @@ pub fn event_spawner_system(
     //mut log_query: Query<&mut Text, With<LogText>>,
     mut orch: ResMut<Orchestrator>,
 ) {
-    if timer.0.tick(time.delta()).just_finished() {
-        // Don't spawn if there's already an active event
-        if existing_events.is_empty() {
-            let mut rng = rand::rng();
+    if !timer.0.tick(time.delta()).just_finished() {
+        return;
+    }
+    if !existing_events.is_empty() {
+        return;
+    }
 
-            // Choose random planet
-            let planet_idx = rng.random_range(0..planet_query.count());
-            if let Some((target, name, id)) = planet_query.iter().nth(planet_idx) {
-                // Choose random event (33% each: Sunray, Asteroid, Nothing)
-                let (entity, ui) = ui_query.iter().find(|&(_, ui)| ui.0 == target).unwrap();
-                let children = children_query.get(entity).unwrap();
-                let log_message = match rng.random_range(0..3) {
-                    0 => {
+    let mut rng = rand::rng();
+
+    // Choose random planet
+    let planet_idx = rng.random_range(0..planet_query.count());
+
+    let Some((target, name, id)) = planet_query.iter().nth(planet_idx) else {
+        warn!("no planet finded with id {planet_idx}");
+        return;
+    };
+    let Some((entity, _)) = ui_query.iter().find(|&(_, ui)| ui.0 == target) else {
+        warn!("no ui finded for such planet");
+        return;
+    };
+    let Ok(children) = children_query.get(entity) else {
+        warn!("no children founded for such ui");
+        return;
+    };
+    let log_message = match rng.random_range(0..3) {
+        0 => {
+            commands.spawn((
+                GalaxyEvent::Sunray,
+                EventTarget {
+                    planet: target,
+                    duration: Timer::from_seconds(3.0, TimerMode::Once),
+                },
+            ));
+            format!(" Sunray approaching planet {name}!")
+        }
+        1 => {
+            let res = {
+                orch.send_to_planet_id(id.0, OrchestratorToPlanet::Asteroid(Asteroid::default()));
+                let res = orch.recv_from_planet_id(id.0);
+
+                orch.send_to_planet_id(id.0, OrchestratorToPlanet::InternalStateRequest);
+
+                match orch.recv_from_planet_id(id.0) {
+                    Ok(msg) => match msg {
+                        PlanetToOrchestrator::InternalStateResponse { planet_state, .. } => {
+                            for child in children.iter() {
+                                if let Ok(mut cell) = cell_query.get_mut(child) {
+                                    cell.num_cell = planet_state.energy_cells.len();
+                                    cell.charged_cell = planet_state.charged_cells_count;
+                                }
+                                if let Ok(mut rocket) = rocket_query.get_mut(child) {
+                                    rocket.0 = planet_state.has_rocket;
+                                }
+                            }
+                        }
+                        _other => warn!("Wrong message received"),
+                    },
+                    Err(e) => {
+                        warn!("An error occurred while waiting or request timed out, Err: {e}");
+                    }
+                }
+                res
+            };
+            match res {
+                Ok(msg) => match msg {
+                    PlanetToOrchestrator::AsteroidAck { rocket: None, .. } => {
                         commands.spawn((
-                            GalaxyEvent::Sunray,
+                            GalaxyEvent::Asteroid,
                             EventTarget {
                                 planet: target,
                                 duration: Timer::from_seconds(3.0, TimerMode::Once),
                             },
                         ));
-                        format!(" Sunray approaching planet {}!", name.0)
-                    }
-                    1 => {
-                        let res = {
-                            orch.send_to_planet_id(
-                                id.0,
-                                OrchestratorToPlanet::Asteroid(Asteroid::default()),
-                            );
-                            let res = orch.recv_from_planet_id(id.0);
-
-                            orch.send_to_planet_id(
-                                id.0,
-                                OrchestratorToPlanet::InternalStateRequest,
-                            );
-
-                            match orch.recv_from_planet_id(id.0) {
-                                Ok(msg) => match msg {
-                                    PlanetToOrchestrator::InternalStateResponse {
-                                        planet_state,
-                                        ..
-                                    } => {
-                                        for child in children.iter() {
-                                            if let Ok(mut cell) = cell_query.get_mut(child) {
-                                                cell.num_cell = planet_state.energy_cells.len();
-                                                cell.charged_cell =
-                                                    planet_state.charged_cells_count;
-                                            }
-                                            if let Ok(mut rocket) = rocket_query.get_mut(child) {
-                                                rocket.0 = planet_state.has_rocket;
-                                            }
-                                        }
-                                    }
-                                    _other => warn!("Wrong message received"),
-                                },
-                                Err(e) => {
-                                    warn!(
-                                        "An error occurred while waiting or request timed out, Err: {e}"
-                                    );
-                                }
-                            }
-                            res
-                        };
-                        match res {
+                        orch.send_to_planet_id(id.0, OrchestratorToPlanet::KillPlanet);
+                        match orch.recv_from_planet_id(id.0) {
                             Ok(msg) => match msg {
-                                PlanetToOrchestrator::AsteroidAck { rocket: None, .. } => {
-                                    commands.spawn((
-                                        GalaxyEvent::Asteroid,
-                                        EventTarget {
-                                            planet: target,
-                                            duration: Timer::from_seconds(3.0, TimerMode::Once),
-                                        },
-                                    ));
-                                    orch.send_to_planet_id(id.0, OrchestratorToPlanet::KillPlanet);
-                                    match orch.recv_from_planet_id(id.0) {
-                                        Ok(msg) => match msg {
-                                            PlanetToOrchestrator::KillPlanetResult {
-                                                planet_id,
-                                            } => {
-                                                info!("planet {planet_id} kiled successfully")
-                                            }
-                                            _other => warn!("Wrong message received"),
-                                        },
-                                        Err(e) => {
-                                            warn!(
-                                                "An error occurred while waiting or request timed out, Err: {e}"
-                                            );
-                                        }
-                                    }
-                                    orch.join_planet_id(id.0);
-                                    format!(" Asteroid approaching planet {}!", name.0)
+                                PlanetToOrchestrator::KillPlanetResult { planet_id } => {
+                                    info!("planet {planet_id} kiled successfully")
                                 }
-                                PlanetToOrchestrator::AsteroidAck {
-                                    rocket: Some(_), ..
-                                } => {
-                                    format!(
-                                        " Asteroid approaching planet {} Was destroyed by a rocket 󱎯",
-                                        name.0
-                                    )
-                                }
-                                _other => "Wrong message received".to_string(),
+                                _other => warn!("Wrong message received"),
                             },
-                            Err(e) => format!("Error {e}"),
-                        } /*
-                        commands.spawn((
-                        GalaxyEvent::Asteroid,
-                        EventTarget {
-                        planet: target,
-                        duration: Timer::from_seconds(3.0, TimerMode::Once),
-                        },
-                        ));
-                        format!(
-                        " Asteroid approaching planet {} Was destroyed by a rocket 󱎯",
-                        name.0
-                        )*/
+                            Err(e) => {
+                                warn!(
+                                    "An error occurred while waiting or request timed out, Err: {e}"
+                                );
+                            }
+                        }
+                        orch.join_planet_id(id.0);
+                        format!(" Asteroid approaching planet {name}!")
                     }
-                    _ => "󰒲 Nothing happening this cycle.".to_string(),
-                };
-
-                info!(log_message);
-                // Update UI text instead of printing
-                /*if let Ok(mut text) = log_query.single_mut() {
-                    text.0 = format!("\n{}\n{}", log_message, text.0);
-                }*/
+                    PlanetToOrchestrator::AsteroidAck {
+                        rocket: Some(_), ..
+                    } => {
+                        format!(" Asteroid approaching planet {name} Was destroyed by a rocket 󱎯",)
+                    }
+                    _other => "Wrong message received".to_string(),
+                },
+                Err(e) => format!("Error {e}"),
             }
         }
-    }
+        _ => "󰒲 Nothing happening this cycle.".to_string(),
+    };
+
+    info!(log_message);
+    // Update UI text instead of printing
+    /*if let Ok(mut text) = log_query.single_mut() {
+        text.0 = format!("\n{}\n{}", log_message, text.0);
+    }*/
 }
 
 pub fn event_visual_system(
@@ -180,26 +162,27 @@ pub fn event_visual_system(
 ) {
     // Create visuals for new events
     for (event, target, event_entity) in event_query.iter() {
-        if let Ok(transform) = planet_query.get(target.planet) {
-            let (color, size) = match event {
-                GalaxyEvent::Sunray => (Color::srgb(1.0, 1.0, 0.0), Vec2::new(40.0, 40.0)),
-                GalaxyEvent::Asteroid => (Color::srgb(0.5, 0.5, 0.5), Vec2::new(35.0, 35.0)),
-            };
+        let Ok(transform) = planet_query.get(target.planet) else {
+            continue;
+        };
+        let (color, size) = match event {
+            GalaxyEvent::Sunray => (Color::srgb(1.0, 1.0, 0.0), Vec2::new(40.0, 40.0)),
+            GalaxyEvent::Asteroid => (Color::srgb(0.5, 0.5, 0.5), Vec2::new(35.0, 35.0)),
+        };
 
-            commands.entity(event_entity).insert((
-                Sprite {
-                    color,
-                    custom_size: Some(size),
-                    ..default()
-                },
-                Transform::from_xyz(
-                    transform.translation.x,
-                    transform.translation.y + 100.0,
-                    2.0,
-                ),
-                EventVisual,
-            ));
-        }
+        commands.entity(event_entity).insert((
+            Sprite {
+                color,
+                custom_size: Some(size),
+                ..default()
+            },
+            Transform::from_xyz(
+                transform.translation.x,
+                transform.translation.y + 100.0,
+                2.0,
+            ),
+            EventVisual,
+        ));
     }
 
     // Animate existing visuals (simple bobbing effect)
@@ -217,7 +200,7 @@ pub fn event_handler_system(
     mut commands: Commands,
     time: Res<Time>,
     mut event_query: Query<(&GalaxyEvent, &mut EventTarget)>,
-    planet_query: Query<(&PlanetName, &PlanetId), With<Planet>>,
+    planet_query: Query<(&Name, &PlanetId), With<Planet>>,
     ui_query: Query<(Entity, &PlanetUi)>,
     children_query: Query<&Children, With<PlanetUi>>,
     mut cell_query: Query<&mut PlanetCell>,
@@ -227,76 +210,72 @@ pub fn event_handler_system(
 ) {
     for (event, mut target) in &mut event_query {
         target.duration.tick(time.delta());
+        if !target.duration.just_finished() {
+            continue;
+        }
+        let Ok((name, id)) = planet_query.get(target.planet) else {
+            continue;
+        };
+        let Some((entity, _)) = ui_query.iter().find(|&(_, ui)| ui.0 == target.planet) else {
+            continue;
+        };
+        let Ok(children) = children_query.get(entity) else {
+            continue;
+        };
+        let log_message = match event {
+            GalaxyEvent::Sunray => {
+                let res = {
+                    orch.send_to_planet_id(id.0, OrchestratorToPlanet::Sunray(Sunray::default()));
+                    let res = orch.recv_from_planet_id(id.0);
 
-        if target.duration.just_finished()
-            && let Ok((name, id)) = planet_query.get(target.planet)
-        {
-            let (entity, ui) = ui_query
-                .iter()
-                .find(|&(_, ui)| ui.0 == target.planet)
-                .unwrap();
-            let children = children_query.get(entity).unwrap();
-            let log_message = match event {
-                GalaxyEvent::Sunray => {
-                    let res = {
-                        orch.send_to_planet_id(
-                            id.0,
-                            OrchestratorToPlanet::Sunray(Sunray::default()),
-                        );
-                        let res = orch.recv_from_planet_id(id.0);
+                    orch.send_to_planet_id(id.0, OrchestratorToPlanet::InternalStateRequest);
 
-                        orch.send_to_planet_id(id.0, OrchestratorToPlanet::InternalStateRequest);
-
-                        match orch.recv_from_planet_id(id.0) {
-                            Ok(msg) => match msg {
-                                PlanetToOrchestrator::InternalStateResponse {
-                                    planet_state,
-                                    ..
-                                } => {
-                                    for child in children.iter() {
-                                        if let Ok(mut cell) = cell_query.get_mut(child) {
-                                            cell.num_cell = planet_state.energy_cells.len();
-                                            cell.charged_cell = planet_state.charged_cells_count;
-                                        }
-                                        if let Ok(mut rocket) = rocket_query.get_mut(child) {
-                                            rocket.0 = planet_state.has_rocket;
-                                        }
+                    match orch.recv_from_planet_id(id.0) {
+                        Ok(msg) => match msg {
+                            PlanetToOrchestrator::InternalStateResponse {
+                                planet_state, ..
+                            } => {
+                                for child in children.iter() {
+                                    if let Ok(mut cell) = cell_query.get_mut(child) {
+                                        cell.num_cell = planet_state.energy_cells.len();
+                                        cell.charged_cell = planet_state.charged_cells_count;
+                                    }
+                                    if let Ok(mut rocket) = rocket_query.get_mut(child) {
+                                        rocket.0 = planet_state.has_rocket;
                                     }
                                 }
-                                _other => warn!("Wrong message received"),
-                            },
-                            Err(e) => {
-                                warn!(
-                                    "An error occurred while waiting or request timed out, Err: {e}"
-                                );
-                            }
-                        }
-                        res
-                    };
-
-                    match res {
-                        Ok(msg) => match msg {
-                            PlanetToOrchestrator::SunrayAck { planet_id } => {
-                                info!("Sunray received by {planet_id}");
                             }
                             _other => warn!("Wrong message received"),
                         },
-                        Err(e) => warn!("Error {e}"),
+                        Err(e) => {
+                            warn!("An error occurred while waiting or request timed out, Err: {e}");
+                        }
                     }
-                    format!("󰂄 Sunray hit {}! Energy increased.", name.0)
-                }
-                GalaxyEvent::Asteroid => {
-                    commands.entity(target.planet).despawn();
-                    format!("󰈸 Asteroid hit {}! Planet destroyed.", name.0)
-                }
-            };
+                    res
+                };
 
-            // Update UI text instead of printing
-            info!(log_message);
-            /*if let Ok(mut text) = log_query.single_mut() {
-                text.0 = format!("\n{}\n{}", log_message, text.0);
-            }*/
-        }
+                match res {
+                    Ok(msg) => match msg {
+                        PlanetToOrchestrator::SunrayAck { planet_id } => {
+                            info!("Sunray received by {planet_id}");
+                        }
+                        _other => warn!("Wrong message received"),
+                    },
+                    Err(e) => warn!("Error {e}"),
+                }
+                format!("󰂄 Sunray hit {name}! Energy increased.")
+            }
+            GalaxyEvent::Asteroid => {
+                commands.entity(target.planet).despawn();
+                format!("󰈸 Asteroid hit {name}! Planet destroyed.")
+            }
+        };
+
+        // Update UI text instead of printing
+        info!(log_message);
+        /*if let Ok(mut text) = log_query.single_mut() {
+            text.0 = format!("\n{}\n{}", log_message, text.0);
+        }*/
     }
 }
 
@@ -304,8 +283,9 @@ pub fn event_handler_system(
 
 pub fn cleanup_events_system(mut commands: Commands, event_query: Query<(Entity, &EventTarget)>) {
     for (entity, target) in event_query.iter() {
-        if target.duration.is_finished() {
-            commands.entity(entity).despawn();
+        if !target.duration.is_finished() {
+            continue;
         }
+        commands.entity(entity).despawn();
     }
 }

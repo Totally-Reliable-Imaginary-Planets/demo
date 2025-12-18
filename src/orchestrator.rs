@@ -31,6 +31,8 @@ impl Orchestrator {
     }
 
     pub fn join_planet_id(&mut self, id: u32) {
+        let tx = self.orch_tx.remove(&id).unwrap();
+        drop(tx);
         match self.planet_handle.remove(&id).unwrap().join() {
             Ok(()) => info!("planet {id} joined successfully"),
             Err(e) => error!("and error {:?} occurred while joining the planet {id}", e),
