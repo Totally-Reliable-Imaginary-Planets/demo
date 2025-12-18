@@ -1,4 +1,7 @@
-use bevy::prelude::*;
+use bevy::{
+    diagnostic::{FrameTimeDiagnosticsPlugin, LogDiagnosticsPlugin},
+    prelude::*,
+};
 mod explorer;
 mod galaxy_event;
 mod orchestrator;
@@ -17,6 +20,10 @@ use crate::resources::PlanetEntities;
 fn main() {
     App::new()
         .add_plugins(DefaultPlugins)
+        // Adds frame time diagnostics
+        .add_plugins(FrameTimeDiagnosticsPlugin::default())
+        // Adds a system that prints diagnostics to the console
+        .add_plugins(LogDiagnosticsPlugin::default())
         .init_state::<GameState>()
         .add_systems(Startup, setup)
         .add_plugins((
@@ -32,6 +39,15 @@ enum GameState {
     #[default]
     Settings,
     Playing,
+}
+
+impl GameState {
+    pub fn next(self) -> Self {
+        match self {
+            GameState::Settings => GameState::Playing,
+            GameState::Playing => GameState::Settings,
+        }
+    }
 }
 
 #[derive(Component)]

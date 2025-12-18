@@ -1,4 +1,5 @@
 use bevy::prelude::*;
+use common_game::components::planet::Planet;
 use common_game::protocols::messages::*;
 use crossbeam_channel::*;
 use std::collections::HashMap;
@@ -9,6 +10,7 @@ pub struct Orchestrator {
     orch_tx: HashMap<u32, Sender<OrchestratorToPlanet>>,
     planet_rx: HashMap<u32, Receiver<PlanetToOrchestrator>>,
     planet_handle: HashMap<u32, JoinHandle<()>>,
+    planet_id: u32,
 }
 
 impl Orchestrator {
@@ -17,6 +19,7 @@ impl Orchestrator {
             orch_tx: HashMap::new(),
             planet_rx: HashMap::new(),
             planet_handle: HashMap::new(),
+            planet_id: 0,
         }
     }
 

@@ -10,11 +10,6 @@ use crate::EventSpawnTimer;
 use crate::LogText;
 use crate::PlanetEntities;
 use crate::planet::*;
-/*use crate::simulation::PlanetAlphaStateRes;
-use crate::simulation::PlanetBetaStateRes;
-use crate::simulation::PlanetState;
-use crate::simulation::PlanetStates;
-use crate::simulation::PlanetToUpdate;*/
 
 #[derive(Component)]
 pub enum GalaxyEvent {
@@ -30,6 +25,17 @@ pub struct EventTarget {
 
 #[derive(Component)]
 pub struct EventVisual;
+
+fn handle_spawn_sunray_event(commands: &mut Commands, target: Entity, name: &str) -> String {
+    commands.spawn((
+        GalaxyEvent::Sunray,
+        EventTarget {
+            planet: target,
+            duration: Timer::from_seconds(3.0, TimerMode::Once),
+        },
+    ));
+    format!(" Sunray approaching planet {name}!")
+}
 
 pub fn event_spawner_system(
     mut commands: Commands,
@@ -69,45 +75,10 @@ pub fn event_spawner_system(
         return;
     };
     let log_message = match rng.random_range(0..3) {
-        0 => {
-            commands.spawn((
-                GalaxyEvent::Sunray,
-                EventTarget {
-                    planet: target,
-                    duration: Timer::from_seconds(3.0, TimerMode::Once),
-                },
-            ));
-            format!(" Sunray approaching planet {name}!")
-        }
+        0 => handle_spawn_sunray_event(&mut commands, target, name),
         1 => {
-            let res = {
-                orch.send_to_planet_id(id.0, OrchestratorToPlanet::Asteroid(Asteroid::default()));
-                let res = orch.recv_from_planet_id(id.0);
-
-                orch.send_to_planet_id(id.0, OrchestratorToPlanet::InternalStateRequest);
-
-                match orch.recv_from_planet_id(id.0) {
-                    Ok(msg) => match msg {
-                        PlanetToOrchestrator::InternalStateResponse { planet_state, .. } => {
-                            for child in children.iter() {
-                                if let Ok(mut cell) = cell_query.get_mut(child) {
-                                    cell.num_cell = planet_state.energy_cells.len();
-                                    cell.charged_cell = planet_state.charged_cells_count;
-                                }
-                                if let Ok(mut rocket) = rocket_query.get_mut(child) {
-                                    rocket.0 = planet_state.has_rocket;
-                                }
-                            }
-                        }
-                        _other => warn!("Wrong message received"),
-                    },
-                    Err(e) => {
-                        warn!("An error occurred while waiting or request timed out, Err: {e}");
-                    }
-                }
-                res
-            };
-            match res {
+            orch.send_to_planet_id(id.0, OrchestratorToPlanet::Asteroid(Asteroid::default()));
+            match orch.recv_from_planet_id(id.0) {
                 Ok(msg) => match msg {
                     PlanetToOrchestrator::AsteroidAck { rocket: None, .. } => {
                         commands.spawn((
@@ -137,6 +108,32 @@ pub fn event_spawner_system(
                     PlanetToOrchestrator::AsteroidAck {
                         rocket: Some(_), ..
                     } => {
+                        orch.send_to_planet_id(id.0, OrchestratorToPlanet::InternalStateRequest);
+
+                        match orch.recv_from_planet_id(id.0) {
+                            Ok(msg) => match msg {
+                                PlanetToOrchestrator::InternalStateResponse {
+                                    planet_state,
+                                    ..
+                                } => {
+                                    for child in children.iter() {
+                                        if let Ok(mut cell) = cell_query.get_mut(child) {
+                                            cell.num_cell = planet_state.energy_cells.len();
+                                            cell.charged_cell = planet_state.charged_cells_count;
+                                        }
+                                        if let Ok(mut rocket) = rocket_query.get_mut(child) {
+                                            rocket.0 = planet_state.has_rocket;
+                                        }
+                                    }
+                                }
+                                _other => warn!("Wrong message received"),
+                            },
+                            Err(e) => {
+                                warn!(
+                                    "An error occurred while waiting or request timed out, Err: {e}"
+                                );
+                            }
+                        }
                         format!(" Asteroid approaching planet {name} Was destroyed by a rocket 󱎯",)
                     }
                     _other => "Wrong message received".to_string(),
@@ -267,6 +264,7 @@ pub fn event_handler_system(
             }
             GalaxyEvent::Asteroid => {
                 commands.entity(target.planet).despawn();
+                commands.entity(entity).despawn();
                 format!("󰈸 Asteroid hit {name}! Planet destroyed.")
             }
         };

@@ -20,6 +20,7 @@ fn setup(mut commands: Commands) {
             overflow: Overflow::scroll_y(),
             ..default()
         },
+        DespawnOnExit(GameState::Settings),
         BackgroundColor(Color::BLACK.with_alpha(0.7)),
         Text::new("Press R to restart"),
         TextFont::default().with_font_size(16.0),
@@ -29,14 +30,13 @@ fn setup(mut commands: Commands) {
 }
 
 fn reset_game(
-    mut commands: Commands,
     dialog: Single<Entity, With<SettingsDialog>>,
     keyboard_input: Res<ButtonInput<KeyCode>>,
     mut next_state: ResMut<NextState<GameState>>,
+    current_state: Res<State<GameState>>,
 ) {
     if !keyboard_input.pressed(KeyCode::KeyR) {
         return;
     }
-    next_state.set(GameState::Playing);
-    commands.entity(*dialog).despawn();
+    next_state.set(current_state.next());
 }
