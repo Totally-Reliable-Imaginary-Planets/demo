@@ -150,45 +150,47 @@ pub fn event_spawner_system(
         text.0 = format!("\n{}\n{}", log_message, text.0);
     }*/
 }
-
-pub fn event_visual_system(
+pub fn event_visual_spawn(
     mut commands: Commands,
-    event_query: Query<(&GalaxyEvent, &EventTarget, Entity), Without<EventVisual>>,
-    planet_query: Query<&Transform, (With<Planet>, Without<EventVisual>)>,
-    mut existing_visuals: Query<(&mut Transform, &mut Sprite), With<EventVisual>>,
+    event_query: Single<(&GalaxyEvent, &EventTarget, Entity), Without<EventVisual>>,
+    planet_query: Query<&Transform, With<Planet>>,
 ) {
     // Create visuals for new events
-    for (event, target, event_entity) in event_query.iter() {
-        let Ok(transform) = planet_query.get(target.planet) else {
-            continue;
-        };
-        let (color, size) = match event {
-            GalaxyEvent::Sunray => (Color::srgb(1.0, 1.0, 0.0), Vec2::new(40.0, 40.0)),
-            GalaxyEvent::Asteroid => (Color::srgb(0.5, 0.5, 0.5), Vec2::new(35.0, 35.0)),
-        };
+    let (event, target, event_entity) = event_query.into_inner();
+    let Ok(transform) = planet_query.get(target.planet) else {
+        return;
+    };
+    let (color, size) = match event {
+        GalaxyEvent::Sunray => (Color::srgb(1.0, 1.0, 0.0), Vec2::new(40.0, 40.0)),
+        GalaxyEvent::Asteroid => (Color::srgb(0.5, 0.5, 0.5), Vec2::new(35.0, 35.0)),
+    };
 
-        commands.entity(event_entity).insert((
-            Sprite {
-                color,
-                custom_size: Some(size),
-                ..default()
-            },
-            Transform::from_xyz(
-                transform.translation.x,
-                transform.translation.y + 100.0,
-                2.0,
-            ),
-            EventVisual,
-        ));
-    }
+    commands.entity(event_entity).insert((
+        Sprite {
+            color,
+            custom_size: Some(size),
+            ..default()
+        },
+        Transform::from_xyz(
+            transform.translation.x,
+            transform.translation.y + 100.0,
+            2.0,
+        ),
+        EventVisual,
+    ));
+}
 
+pub fn event_visual_move(
+    mut commands: Commands,
+    planet_query: Query<&Transform, (With<Planet>, Without<EventVisual>)>,
+    mut existing_visuals: Single<(&mut Transform, &mut Sprite), With<EventVisual>>,
+) {
     // Animate existing visuals (simple bobbing effect)
-    for (mut transform, mut sprite) in &mut existing_visuals {
-        transform.translation.y -= 20.0 * 0.016;
+    let (mut transform, mut sprite) = existing_visuals.into_inner();
+    transform.translation.y -= 20.0 * 0.016;
 
-        let new_alpha = (sprite.color.alpha() - 0.01).max(0.3);
-        sprite.color.set_alpha(new_alpha);
-    }
+    let new_alpha = (sprite.color.alpha() - 0.01).max(0.3);
+    sprite.color.set_alpha(new_alpha);
 }
 
 // ===== Event Handler System =====
@@ -196,7 +198,7 @@ pub fn event_visual_system(
 pub fn event_handler_system(
     mut commands: Commands,
     time: Res<Time>,
-    mut event_query: Query<(&GalaxyEvent, &mut EventTarget)>,
+    mut event_query: Single<(&GalaxyEvent, &mut EventTarget)>,
     planet_query: Query<(&Name, &PlanetId), With<Planet>>,
     ui_query: Query<(Entity, &PlanetUi)>,
     children_query: Query<&Children, With<PlanetUi>>,
@@ -205,85 +207,81 @@ pub fn event_handler_system(
     //mut log_query: Query<&mut Text, With<LogText>>,
     orch: Res<Orchestrator>,
 ) {
-    for (event, mut target) in &mut event_query {
-        target.duration.tick(time.delta());
-        if !target.duration.just_finished() {
-            continue;
-        }
-        let Ok((name, id)) = planet_query.get(target.planet) else {
-            continue;
-        };
-        let Some((entity, _)) = ui_query.iter().find(|&(_, ui)| ui.0 == target.planet) else {
-            continue;
-        };
-        let Ok(children) = children_query.get(entity) else {
-            continue;
-        };
-        let log_message = match event {
-            GalaxyEvent::Sunray => {
-                let res = {
-                    orch.send_to_planet_id(id.0, OrchestratorToPlanet::Sunray(Sunray::default()));
-                    let res = orch.recv_from_planet_id(id.0);
+    let (event, mut target) = event_query.into_inner();
+    target.duration.tick(time.delta());
+    if !target.duration.just_finished() {
+        return;
+    }
+    let Ok((name, id)) = planet_query.get(target.planet) else {
+        return;
+    };
+    let Some((entity, _)) = ui_query.iter().find(|&(_, ui)| ui.0 == target.planet) else {
+        return;
+    };
+    let Ok(children) = children_query.get(entity) else {
+        return;
+    };
+    let log_message = match event {
+        GalaxyEvent::Sunray => {
+            let res = {
+                orch.send_to_planet_id(id.0, OrchestratorToPlanet::Sunray(Sunray::default()));
+                let res = orch.recv_from_planet_id(id.0);
 
-                    orch.send_to_planet_id(id.0, OrchestratorToPlanet::InternalStateRequest);
+                orch.send_to_planet_id(id.0, OrchestratorToPlanet::InternalStateRequest);
 
-                    match orch.recv_from_planet_id(id.0) {
-                        Ok(msg) => match msg {
-                            PlanetToOrchestrator::InternalStateResponse {
-                                planet_state, ..
-                            } => {
-                                for child in children.iter() {
-                                    if let Ok(mut cell) = cell_query.get_mut(child) {
-                                        cell.num_cell = planet_state.energy_cells.len();
-                                        cell.charged_cell = planet_state.charged_cells_count;
-                                    }
-                                    if let Ok(mut rocket) = rocket_query.get_mut(child) {
-                                        rocket.0 = planet_state.has_rocket;
-                                    }
+                match orch.recv_from_planet_id(id.0) {
+                    Ok(msg) => match msg {
+                        PlanetToOrchestrator::InternalStateResponse { planet_state, .. } => {
+                            for child in children.iter() {
+                                if let Ok(mut cell) = cell_query.get_mut(child) {
+                                    cell.num_cell = planet_state.energy_cells.len();
+                                    cell.charged_cell = planet_state.charged_cells_count;
+                                }
+                                if let Ok(mut rocket) = rocket_query.get_mut(child) {
+                                    rocket.0 = planet_state.has_rocket;
                                 }
                             }
-                            _other => warn!("Wrong message received"),
-                        },
-                        Err(e) => {
-                            warn!("An error occurred while waiting or request timed out, Err: {e}");
-                        }
-                    }
-                    res
-                };
-
-                match res {
-                    Ok(msg) => match msg {
-                        PlanetToOrchestrator::SunrayAck { planet_id } => {
-                            info!("Sunray received by {planet_id}");
                         }
                         _other => warn!("Wrong message received"),
                     },
-                    Err(e) => warn!("Error {e}"),
+                    Err(e) => {
+                        warn!("An error occurred while waiting or request timed out, Err: {e}");
+                    }
                 }
-                format!("󰂄 Sunray hit {name}! Energy increased.")
-            }
-            GalaxyEvent::Asteroid => {
-                commands.entity(target.planet).despawn();
-                commands.entity(entity).despawn();
-                format!("󰈸 Asteroid hit {name}! Planet destroyed.")
-            }
-        };
+                res
+            };
 
-        // Update UI text instead of printing
-        info!(log_message);
-        /*if let Ok(mut text) = log_query.single_mut() {
-            text.0 = format!("\n{}\n{}", log_message, text.0);
-        }*/
-    }
+            match res {
+                Ok(msg) => match msg {
+                    PlanetToOrchestrator::SunrayAck { planet_id } => {
+                        info!("Sunray received by {planet_id}");
+                    }
+                    _other => warn!("Wrong message received"),
+                },
+                Err(e) => warn!("Error {e}"),
+            }
+            format!("󰂄 Sunray hit {name}! Energy increased.")
+        }
+        GalaxyEvent::Asteroid => {
+            commands.entity(target.planet).despawn();
+            commands.entity(entity).despawn();
+            format!("󰈸 Asteroid hit {name}! Planet destroyed.")
+        }
+    };
+
+    // Update UI text instead of printing
+    info!(log_message);
+    /*if let Ok(mut text) = log_query.single_mut() {
+        text.0 = format!("\n{}\n{}", log_message, text.0);
+    }*/
 }
 
 // ===== Cleanup Events System =====
 
-pub fn cleanup_events_system(mut commands: Commands, event_query: Query<(Entity, &EventTarget)>) {
-    for (entity, target) in event_query.iter() {
-        if !target.duration.is_finished() {
-            continue;
-        }
-        commands.entity(entity).despawn();
+pub fn cleanup_events_system(mut commands: Commands, event_query: Single<(Entity, &EventTarget)>) {
+    let (entity, target) = event_query.into_inner();
+    if !target.duration.is_finished() {
+        return;
     }
+    commands.entity(entity).despawn();
 }

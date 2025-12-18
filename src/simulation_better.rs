@@ -1,5 +1,6 @@
 use crate::EventSpawnTimer;
 use crate::GameState;
+use crate::galaxy_event::*;
 use crate::orchestrator::Orchestrator;
 use crate::planet::*;
 use bevy::prelude::*;
@@ -15,7 +16,8 @@ pub fn simulation_better_plugin(app: &mut App) {
                 crate::galaxy_event::event_spawner_system,
                 crate::galaxy_event::event_handler_system,
                 crate::galaxy_event::cleanup_events_system,
-                crate::galaxy_event::event_visual_system,
+                crate::galaxy_event::event_visual_spawn,
+                crate::galaxy_event::event_visual_move,
                 check_entities_and_end_game,
                 update_planet_cell,
                 update_planet_rocket,
