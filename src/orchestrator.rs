@@ -34,6 +34,7 @@ impl Orchestrator {
     }
 
     pub fn join_planet_id(&mut self, id: u32) {
+        self.planet_rx.remove(&id).unwrap();
         let tx = self.orch_tx.remove(&id).unwrap();
         drop(tx);
         match self.planet_handle.remove(&id).unwrap().join() {
@@ -62,6 +63,6 @@ impl Orchestrator {
         self.planet_rx
             .get(&id)
             .unwrap()
-            .recv_timeout(std::time::Duration::from_millis(100))
+            .recv_timeout(std::time::Duration::from_millis(1))
     }
 }

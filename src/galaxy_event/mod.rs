@@ -151,16 +151,19 @@ pub fn event_spawner_system(
     }*/
 }
 pub fn event_visual_spawn(
+    event: On<Add, GalaxyEvent>,
     mut commands: Commands,
-    event_query: Single<(&GalaxyEvent, &EventTarget, Entity), Without<EventVisual>>,
+    event_query: Query<(&GalaxyEvent, &EventTarget, Entity), Without<EventVisual>>,
     planet_query: Query<&Transform, With<Planet>>,
 ) {
     // Create visuals for new events
-    let (event, target, event_entity) = event_query.into_inner();
+    let Ok((event_type, target, event_entity)) = event_query.get(event.entity) else {
+        return;
+    };
     let Ok(transform) = planet_query.get(target.planet) else {
         return;
     };
-    let (color, size) = match event {
+    let (color, size) = match event_type {
         GalaxyEvent::Sunray => (Color::srgb(1.0, 1.0, 0.0), Vec2::new(40.0, 40.0)),
         GalaxyEvent::Asteroid => (Color::srgb(0.5, 0.5, 0.5), Vec2::new(35.0, 35.0)),
     };
@@ -183,14 +186,15 @@ pub fn event_visual_spawn(
 pub fn event_visual_move(
     mut commands: Commands,
     planet_query: Query<&Transform, (With<Planet>, Without<EventVisual>)>,
-    mut existing_visuals: Single<(&mut Transform, &mut Sprite), With<EventVisual>>,
+    mut existing_visuals: Query<(&mut Transform, &mut Sprite), With<EventVisual>>,
 ) {
     // Animate existing visuals (simple bobbing effect)
-    let (mut transform, mut sprite) = existing_visuals.into_inner();
-    transform.translation.y -= 20.0 * 0.016;
+    for (mut transform, mut sprite) in existing_visuals.iter_mut() {
+        transform.translation.y -= 20.0 * 0.016;
 
-    let new_alpha = (sprite.color.alpha() - 0.01).max(0.3);
-    sprite.color.set_alpha(new_alpha);
+        let new_alpha = (sprite.color.alpha() - 0.01).max(0.3);
+        sprite.color.set_alpha(new_alpha);
+    }
 }
 
 // ===== Event Handler System =====

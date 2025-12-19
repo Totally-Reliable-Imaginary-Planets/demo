@@ -1,5 +1,7 @@
 use bevy::{
-    diagnostic::{FrameTimeDiagnosticsPlugin, LogDiagnosticsPlugin},
+    diagnostic::{
+        FrameTimeDiagnosticsPlugin, LogDiagnosticsPlugin, SystemInformationDiagnosticsPlugin,
+    },
     prelude::*,
 };
 mod explorer;
@@ -20,6 +22,7 @@ use crate::resources::PlanetEntities;
 fn main() {
     App::new()
         .add_plugins(DefaultPlugins)
+        //.add_plugins(SystemInformationDiagnosticsPlugin)
         // Adds frame time diagnostics
         .add_plugins(FrameTimeDiagnosticsPlugin::default())
         // Adds a system that prints diagnostics to the console

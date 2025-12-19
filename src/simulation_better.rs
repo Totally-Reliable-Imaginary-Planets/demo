@@ -16,14 +16,20 @@ pub fn simulation_better_plugin(app: &mut App) {
                 crate::galaxy_event::event_spawner_system,
                 crate::galaxy_event::event_handler_system,
                 crate::galaxy_event::cleanup_events_system,
-                crate::galaxy_event::event_visual_spawn,
                 crate::galaxy_event::event_visual_move,
+            )
+                .run_if(in_state(GameState::Playing)),
+        )
+        .add_systems(
+            PostUpdate,
+            (
                 check_entities_and_end_game,
                 update_planet_cell,
                 update_planet_rocket,
             )
                 .run_if(in_state(GameState::Playing)),
-        );
+        )
+        .add_observer(event_visual_spawn);
 }
 
 pub fn setup(mut commands: Commands, asset_server: Res<AssetServer>) {
@@ -153,6 +159,12 @@ pub fn setup(mut commands: Commands, asset_server: Res<AssetServer>) {
     }
 
     commands.insert_resource(orchestrator);
+}
+
+fn listen_to_planets(mut orch: ResMut<Orchestrator>) {
+    //TODO: Iterate throught the planet_rx map and listen with try_recv to every message that could
+    //be sent by the planet
+    todo!();
 }
 
 fn update_planet_cell(mut query: Query<(&mut Text, &PlanetCell), Changed<PlanetCell>>) {
