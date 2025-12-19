@@ -14,6 +14,7 @@ pub fn simulation_better_plugin(app: &mut App) {
             Update,
             (
                 crate::galaxy_event::event_spawner_system,
+                listen_to_planets,
                 crate::galaxy_event::event_handler_system,
                 crate::galaxy_event::cleanup_events_system,
                 crate::galaxy_event::event_visual_move,
@@ -141,7 +142,7 @@ pub fn setup(mut commands: Commands, asset_server: Res<AssetServer>) {
     ));
 
     commands.insert_resource(EventSpawnTimer(Timer::from_seconds(
-        5.0,
+        1.0,
         TimerMode::Repeating,
     )));
 
@@ -161,10 +162,88 @@ pub fn setup(mut commands: Commands, asset_server: Res<AssetServer>) {
     commands.insert_resource(orchestrator);
 }
 
-fn listen_to_planets(mut orch: ResMut<Orchestrator>) {
-    //TODO: Iterate throught the planet_rx map and listen with try_recv to every message that could
-    //be sent by the planet
-    todo!();
+fn listen_to_planets(
+    mut commands: Commands,
+    mut orch: ResMut<Orchestrator>,
+    planet_query: Query<(&PlanetId, Entity), With<Planet>>,
+    ui_query: Query<(Entity, &PlanetUi)>,
+    children_query: Query<&Children, With<PlanetUi>>,
+    mut cell_query: Query<&mut PlanetCell>,
+    mut rocket_query: Query<&mut PlanetRocket>,
+) {
+    for rx in orch.planet_rxs() {
+        match rx.try_recv() {
+            Ok(msg) => match msg {
+                PlanetToOrchestrator::SunrayAck { planet_id } => {
+                    orch.send_to_planet_id(planet_id, OrchestratorToPlanet::InternalStateRequest);
+                    info!("Sunray received by {planet_id}");
+                }
+                PlanetToOrchestrator::AsteroidAck { planet_id, rocket } => match rocket {
+                    Some(_) => {
+                        info!(" Asteroid approaching planet {planet_id} Was destroyed by a rocket 󱎯",);
+                        orch.send_to_planet_id(
+                            planet_id,
+                            OrchestratorToPlanet::InternalStateRequest,
+                        );
+                    }
+                    None => {
+                        let Some((id, planet_entity)) =
+                            planet_query.iter().find(|&(id, _)| id.0 == planet_id)
+                        else {
+                            return;
+                        };
+                        let Some((entity, _)) =
+                            ui_query.iter().find(|&(_, ui)| ui.0 == planet_entity)
+                        else {
+                            return;
+                        };
+                        commands.entity(planet_entity).despawn();
+                        commands.entity(entity).despawn();
+                        orch.send_to_planet_id(planet_id, OrchestratorToPlanet::KillPlanet);
+                    }
+                },
+                PlanetToOrchestrator::StartPlanetAIResult { planet_id } => {}
+                PlanetToOrchestrator::StopPlanetAIResult { planet_id } => {}
+                PlanetToOrchestrator::KillPlanetResult { planet_id } => {
+                    //TODO; send an event to join the planet thread
+                    //  orch.join_planet_id(planet_id);
+                    info!("planet {planet_id} killed successfully");
+                }
+                PlanetToOrchestrator::InternalStateResponse {
+                    planet_id,
+                    planet_state,
+                } => {
+                    let Some((id, planet_entity)) =
+                        planet_query.iter().find(|&(id, _)| id.0 == planet_id)
+                    else {
+                        return;
+                    };
+                    let Some((entity, _)) = ui_query.iter().find(|&(_, ui)| ui.0 == planet_entity)
+                    else {
+                        return;
+                    };
+                    let Ok(children) = children_query.get(entity) else {
+                        return;
+                    };
+
+                    for child in children.iter() {
+                        if let Ok(mut cell) = cell_query.get_mut(child) {
+                            cell.num_cell = planet_state.energy_cells.len();
+                            cell.charged_cell = planet_state.charged_cells_count;
+                        }
+                        if let Ok(mut rocket) = rocket_query.get_mut(child) {
+                            rocket.0 = planet_state.has_rocket;
+                        }
+                    }
+                }
+                PlanetToOrchestrator::IncomingExplorerResponse { planet_id, res } => {}
+                PlanetToOrchestrator::OutgoingExplorerResponse { planet_id, res } => {}
+                PlanetToOrchestrator::Stopped { planet_id } => {}
+            },
+            Err(TryRecvError::Empty) => {}
+            Err(TryRecvError::Disconnected) => {}
+        };
+    }
 }
 
 fn update_planet_cell(mut query: Query<(&mut Text, &PlanetCell), Changed<PlanetCell>>) {

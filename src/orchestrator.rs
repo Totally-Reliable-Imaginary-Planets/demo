@@ -33,6 +33,10 @@ impl Orchestrator {
         self.planet_handle.insert(id, handle);
     }
 
+    pub fn planet_rxs(&self) -> impl Iterator<Item = &Receiver<PlanetToOrchestrator>> {
+        self.planet_rx.values()
+    }
+
     pub fn join_planet_id(&mut self, id: u32) {
         self.planet_rx.remove(&id).unwrap();
         let tx = self.orch_tx.remove(&id).unwrap();
