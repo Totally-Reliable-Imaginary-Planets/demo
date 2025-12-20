@@ -35,8 +35,11 @@ fn reset_game(
     mut next_state: ResMut<NextState<GameState>>,
     current_state: Res<State<GameState>>,
 ) {
-    if !keyboard_input.pressed(KeyCode::KeyR) {
-        return;
+    if keyboard_input.pressed(KeyCode::KeyR) {
+    next_state.set(GameState::Playing);
     }
-    next_state.set(current_state.next());
+
+    if keyboard_input.pressed(KeyCode::KeyC) {
+    next_state.set(GameState::Creative);
+    }
 }

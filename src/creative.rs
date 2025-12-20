@@ -1,75 +1,113 @@
 use super::GameState;
+use crate::galaxy_event::*;
+use crate::orchestrator::Orchestrator;
+use crate::planet::*;
+use crate::simulation_better::*;
 use bevy::prelude::*;
+use common_game::protocols::orchestrator_planet::OrchestratorToPlanet;
+use common_game::protocols::orchestrator_planet::PlanetToOrchestrator;
+use crossbeam_channel::unbounded;
 
 #[derive(Component)]
 struct SettingsDialog;
 
-pub fn plugin(app: &mut App) {
+pub fn creative_plugin(app: &mut App) {
     app.add_systems(OnEnter(GameState::Creative), setup)
-        .add_systems(Update, (check_entities_and_end_game).run_if(in_state(GameState::Creative)),);
+        .add_systems(
+            Update,
+            (
+                crate::galaxy_event::event_visual_move,
+                crate::galaxy_event::event_handler_system,
+                listen_to_planets,
+                crate::galaxy_event::cleanup_events_system,
+            )
+                .chain()
+                .run_if(in_state(GameState::Creative)),
+        )
+        .add_systems(
+            PostUpdate,
+            (
+                check_entities_and_end_game,
+                update_planet_cell,
+                update_planet_rocket,
+            )
+                .run_if(in_state(GameState::Creative)),
+        )
+        .add_observer(event_visual_spawn);
 }
 
-fn setup(mut commands: Commands,
-    mut dialog_query: Query<
-        &mut Visibility,
-        Or<(With<LogText>, With<PlanetAlphaState>)>,
-    >,) {
-    let orchestrator = Orchestrator::new();
-    let explorer_handl = ExplorerHandler::new();
+fn setup(mut commands: Commands, asset_server: Res<AssetServer>) {
+    let mut orchestrator = Orchestrator::new();
+    let mut id = 0;
 
+    let (orch_tx, orch_rx) = unbounded();
+    let (planet_tx, planet_rx) = unbounded();
+    let (_expl_tx, expl_rx) = unbounded();
+    orchestrator.add_op_tx(id, orch_tx);
+    orchestrator.add_po_rx(id, planet_rx);
     // Planets
-    let mut p1 = trip::trip(
-        0,
-        orchestrator.orch_rx_p1.clone(),
-        orchestrator.planet_tx_p1.clone(),
-        explorer_handl.expl_rx_p1.clone(),
-    )
-    .expect("Error createing planet1");
+    let mut p1 = trip::trip(id, orch_rx.clone(), planet_tx.clone(), expl_rx.clone())
+        .expect("Error createing planet1");
     let planet1 = commands
-        .spawn((
-            Sprite {
-                image: asset_server.load("sprites/Terran.png"),
-                custom_size: Some(Vec2::new(120.0, 120.0)),
-                ..default()
-            },
-            Transform::from_xyz(0.0, 0.0, 0.0),
-            Planet::new("Alpha", Vec2::new(0.0, 0.0)),
-            PlanetAlpha,
+        .spawn(planet(
+            id,
+            "Alpha",
+            Vec3::new(0.0, 0.0, 0.0),
+            asset_server.load("sprites/Ice.png"),
         ))
         .id();
+    let p1_handle = std::thread::spawn(move || {
+        let _ = p1.run();
+    });
+    orchestrator.add_planet_handle(id, p1_handle);
 
-    for mut visibility in &mut dialog_query {
-        *visibility = Visibility::Visible;
+    commands.spawn((
+        Node {
+            flex_direction: FlexDirection::Column,
+            row_gap: percent(5.0),
+            left: px(20),
+            height: percent(90.0),
+            width: percent(20.0),
+            top: percent(5.0),
+            ..default()
+        },
+        children![
+            (planet_state(
+                &asset_server,
+                "Alpha",
+                planet1,
+                PlanetCell {
+                    num_cell: 5,
+                    charged_cell: 0,
+                },
+                PlanetRocket(false),
+            )),
+        ],
+    ));
+    for i in 0..=id {
+        orchestrator.send_to_planet_id(i, OrchestratorToPlanet::StartPlanetAI);
+        match orchestrator
+            .recv_from_planet_id(i)
+            .expect("No message received")
+        {
+            PlanetToOrchestrator::StartPlanetAIResult { planet_id } => {
+                info!("Planet {planet_id} started");
+            }
+            _other => panic!("Failed to start planet"),
+        }
     }
 
-    commands.spawn(());
+    commands.insert_resource(orchestrator);
 }
 
-
 fn check_entities_and_end_game(
-    mut commands: Commands,
     planet: Query<&Planet>,
-    explorer: Query<&Planet>,
     mut next_state: ResMut<NextState<GameState>>,
-    query: Query<Entity, With<Planet>>,
-    mut log_query: Query<&mut Text, With<LogText>>,
-    mut dialog_query: Query<
-        &mut Visibility,
-        Or<(With<LogText>, With<PlanetAlphaState>)>,
-    >,
 ) {
-    if planet.is_empty() || explorer.is_empty() {
-        for mut visibility in &mut dialog_query {
-            *visibility = Visibility::Hidden;
-        }
-        for entity in &query {
-            commands.entity(entity).despawn();
-        }
-        // No player entity found → end game
-        next_state.set(GameState::Settings);
-        // Update UI text instead of printing
-        if let Ok(mut text) = log_query.single_mut() {
-            text.0 = String::new();
-        }
+    if !planet.is_empty() {
+        return;
     }
+    // No player entity found → end game
+    next_state.set(GameState::Settings);
+    // Update UI text instead of printing
 }

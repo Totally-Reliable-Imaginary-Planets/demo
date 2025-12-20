@@ -48,16 +48,16 @@ pub fn event_spawner_system(
     };
     let log_message = match rng.random_range(0..3) {
         0 => {
-    commands.spawn((
-        DespawnOnExit(GameState::Playing),
-        GalaxyEvent::Sunray,
-        EventTarget {
-            planet: target,
-            duration: Timer::from_seconds(3.0, TimerMode::Once),
-        },
-    ));
-    format!(" Sunray approaching planet {name}!")
-}
+            commands.spawn((
+                DespawnOnExit(GameState::Playing),
+                GalaxyEvent::Sunray,
+                EventTarget {
+                    planet: target,
+                    duration: Timer::from_seconds(3.0, TimerMode::Once),
+                },
+            ));
+            format!(" Sunray approaching planet {name}!")
+        }
         1 => {
             commands.spawn((
                 DespawnOnExit(GameState::Playing),

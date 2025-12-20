@@ -15,11 +15,12 @@ pub fn simulation_better_plugin(app: &mut App) {
             Update,
             (
                 crate::galaxy_event::event_spawner_system,
-                listen_to_planets,
-                crate::galaxy_event::event_handler_system,
-                crate::galaxy_event::cleanup_events_system,
                 crate::galaxy_event::event_visual_move,
+                crate::galaxy_event::event_handler_system,
+                listen_to_planets,
+                crate::galaxy_event::cleanup_events_system,
             )
+                .chain()
                 .run_if(in_state(GameState::Playing)),
         )
         .add_systems(
@@ -52,7 +53,6 @@ pub fn setup(mut commands: Commands, asset_server: Res<AssetServer>) {
             asset_server.load("sprites/Ice.png"),
         ))
         .id();
-
     let p1_handle = std::thread::spawn(move || {
         let _ = p1.run();
     });
@@ -163,7 +163,7 @@ pub fn setup(mut commands: Commands, asset_server: Res<AssetServer>) {
     commands.insert_resource(orchestrator);
 }
 
-fn listen_to_planets(
+pub fn listen_to_planets(
     mut commands: Commands,
     orch: Res<Orchestrator>,
     planet_query: Query<(&PlanetId, Entity), With<Planet>>,
@@ -181,7 +181,9 @@ fn listen_to_planets(
                 }
                 PlanetToOrchestrator::AsteroidAck { planet_id, rocket } => match rocket {
                     Some(_) => {
-                        info!(" Asteroid approaching planet {planet_id} Was destroyed by a rocket 󱎯",);
+                        info!(
+                            " Asteroid approaching planet {planet_id} Was destroyed by a rocket 󱎯",
+                        );
                         orch.send_to_planet_id(
                             planet_id,
                             OrchestratorToPlanet::InternalStateRequest,
@@ -237,8 +239,16 @@ fn listen_to_planets(
                         }
                     }
                 }
-                PlanetToOrchestrator::IncomingExplorerResponse { planet_id, res, explorer_id } => {}
-                PlanetToOrchestrator::OutgoingExplorerResponse { planet_id, res, explorer_id } => {}
+                PlanetToOrchestrator::IncomingExplorerResponse {
+                    planet_id,
+                    res,
+                    explorer_id,
+                } => {}
+                PlanetToOrchestrator::OutgoingExplorerResponse {
+                    planet_id,
+                    res,
+                    explorer_id,
+                } => {}
                 PlanetToOrchestrator::Stopped { planet_id } => {}
             },
             Err(TryRecvError::Empty) => {}
@@ -247,13 +257,13 @@ fn listen_to_planets(
     }
 }
 
-fn update_planet_cell(mut query: Query<(&mut Text, &PlanetCell), Changed<PlanetCell>>) {
+pub fn update_planet_cell(mut query: Query<(&mut Text, &PlanetCell), Changed<PlanetCell>>) {
     for (mut text, cell) in query.iter_mut() {
         text.0 = cell_string(cell);
     }
 }
 
-fn update_planet_rocket(mut query: Query<(&mut Text, &PlanetRocket), Changed<PlanetRocket>>) {
+pub fn update_planet_rocket(mut query: Query<(&mut Text, &PlanetRocket), Changed<PlanetRocket>>) {
     for (mut text, rocket) in query.iter_mut() {
         if rocket.0 {
             text.0 = "󱎯".to_string();
@@ -272,5 +282,5 @@ fn check_entities_and_end_game(
         return;
     }
     // No player entity found → end game
-    next_state.set(current_state.next());
+    next_state.set(GameState::Settings);
 }

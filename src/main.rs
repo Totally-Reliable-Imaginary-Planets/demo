@@ -11,6 +11,7 @@ mod planet;
 mod resources;
 mod settings;
 //mod simulation;
+mod creative;
 mod simulation_better;
 mod theme;
 
@@ -32,6 +33,7 @@ fn main() {
         .add_plugins((
             settings::settings_plugin,
             simulation_better::simulation_better_plugin,
+            creative::creative_plugin,
         ))
         .run();
 }
@@ -41,16 +43,8 @@ fn main() {
 enum GameState {
     #[default]
     Settings,
+    Creative,
     Playing,
-}
-
-impl GameState {
-    pub fn next(self) -> Self {
-        match self {
-            GameState::Settings => GameState::Playing,
-            GameState::Playing => GameState::Settings,
-        }
-    }
 }
 
 #[derive(Component)]
