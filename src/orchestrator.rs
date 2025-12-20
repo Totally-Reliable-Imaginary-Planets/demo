@@ -1,6 +1,6 @@
 use bevy::prelude::*;
 use common_game::components::planet::Planet;
-use common_game::protocols::messages::*;
+use common_game::protocols::orchestrator_planet::*;
 use crossbeam_channel::*;
 use std::collections::HashMap;
 use std::thread::JoinHandle;

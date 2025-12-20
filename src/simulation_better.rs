@@ -4,7 +4,8 @@ use crate::galaxy_event::*;
 use crate::orchestrator::Orchestrator;
 use crate::planet::*;
 use bevy::prelude::*;
-use common_game::protocols::messages::*;
+use common_game::protocols::orchestrator_planet::*;
+use common_game::protocols::planet_explorer::*;
 use crossbeam_channel::*;
 
 pub fn simulation_better_plugin(app: &mut App) {
@@ -164,7 +165,7 @@ pub fn setup(mut commands: Commands, asset_server: Res<AssetServer>) {
 
 fn listen_to_planets(
     mut commands: Commands,
-    mut orch: ResMut<Orchestrator>,
+    orch: Res<Orchestrator>,
     planet_query: Query<(&PlanetId, Entity), With<Planet>>,
     ui_query: Query<(Entity, &PlanetUi)>,
     children_query: Query<&Children, With<PlanetUi>>,
@@ -236,8 +237,8 @@ fn listen_to_planets(
                         }
                     }
                 }
-                PlanetToOrchestrator::IncomingExplorerResponse { planet_id, res } => {}
-                PlanetToOrchestrator::OutgoingExplorerResponse { planet_id, res } => {}
+                PlanetToOrchestrator::IncomingExplorerResponse { planet_id, res, explorer_id } => {}
+                PlanetToOrchestrator::OutgoingExplorerResponse { planet_id, res, explorer_id } => {}
                 PlanetToOrchestrator::Stopped { planet_id } => {}
             },
             Err(TryRecvError::Empty) => {}

@@ -2,8 +2,7 @@ use crate::orchestrator::Orchestrator;
 use bevy::prelude::*;
 use common_game::components::asteroid::Asteroid;
 use common_game::components::sunray::Sunray;
-use common_game::protocols::messages::OrchestratorToPlanet;
-use common_game::protocols::messages::PlanetToOrchestrator;
+use common_game::protocols::orchestrator_planet::OrchestratorToPlanet;
 use rand::Rng;
 
 use crate::EventSpawnTimer;
@@ -113,7 +112,6 @@ pub fn event_visual_spawn(
 }
 
 pub fn event_visual_move(
-    mut commands: Commands,
     planet_query: Query<&Transform, (With<Planet>, Without<EventVisual>)>,
     mut existing_visuals: Query<(&mut Transform, &mut Sprite), With<EventVisual>>,
 ) {
@@ -129,10 +127,9 @@ pub fn event_visual_move(
 // ===== Event Handler System =====
 
 pub fn event_handler_system(
-    mut commands: Commands,
     time: Res<Time>,
     mut event_query: Query<(&GalaxyEvent, &mut EventTarget)>,
-    planet_query: Query<(&PlanetId), With<Planet>>,
+    planet_query: Query<&PlanetId, With<Planet>>,
     //mut log_query: Query<&mut Text, With<LogText>>,
     orch: Res<Orchestrator>,
 ) {
