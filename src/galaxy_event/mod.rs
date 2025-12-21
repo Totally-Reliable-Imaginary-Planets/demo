@@ -19,8 +19,8 @@ pub enum GalaxyEvent {
 
 #[derive(Component)]
 pub struct EventTarget {
-    planet: Entity,
-    duration: Timer,
+    pub planet: Entity,
+    pub duration: Timer,
 }
 
 #[derive(Component)]
@@ -127,13 +127,14 @@ pub fn event_visual_move(
 // ===== Event Handler System =====
 
 pub fn event_handler_system(
+    mut commands: Commands,
     time: Res<Time>,
-    mut event_query: Query<(&GalaxyEvent, &mut EventTarget)>,
+    mut event_query: Query<(&GalaxyEvent, Entity, &mut EventTarget)>,
     planet_query: Query<&PlanetId, With<Planet>>,
     //mut log_query: Query<&mut Text, With<LogText>>,
     orch: Res<Orchestrator>,
 ) {
-    for (event, mut target) in event_query.iter_mut() {
+    for (event, entity, mut target) in event_query.iter_mut() {
         target.duration.tick(time.delta());
         if !target.duration.just_finished() {
             continue;
@@ -143,9 +144,11 @@ pub fn event_handler_system(
         };
         match event {
             GalaxyEvent::Sunray => {
+                commands.entity(entity).despawn();
                 orch.send_to_planet_id(id.0, OrchestratorToPlanet::Sunray(Sunray::default()));
             }
             GalaxyEvent::Asteroid => {
+                commands.entity(entity).despawn();
                 orch.send_to_planet_id(id.0, OrchestratorToPlanet::Asteroid(Asteroid::default()));
             }
         };

@@ -36,10 +36,10 @@ fn reset_game(
     current_state: Res<State<GameState>>,
 ) {
     if keyboard_input.pressed(KeyCode::KeyR) {
-    next_state.set(GameState::Playing);
+        next_state.set(GameState::Playing);
     }
 
     if keyboard_input.pressed(KeyCode::KeyC) {
-    next_state.set(GameState::Creative);
+        next_state.set(GameState::Creative);
     }
 }

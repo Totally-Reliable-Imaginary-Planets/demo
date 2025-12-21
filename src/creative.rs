@@ -3,6 +3,7 @@ use crate::galaxy_event::*;
 use crate::orchestrator::Orchestrator;
 use crate::planet::*;
 use crate::simulation_better::*;
+use crate::theme;
 use bevy::prelude::*;
 use common_game::protocols::orchestrator_planet::OrchestratorToPlanet;
 use common_game::protocols::orchestrator_planet::PlanetToOrchestrator;
@@ -16,6 +17,7 @@ pub fn creative_plugin(app: &mut App) {
         .add_systems(
             Update,
             (
+                create_event_listen,
                 crate::galaxy_event::event_visual_move,
                 crate::galaxy_event::event_handler_system,
                 listen_to_planets,
@@ -84,6 +86,57 @@ fn setup(mut commands: Commands, asset_server: Res<AssetServer>) {
             )),
         ],
     ));
+
+    let width = percent(25.0);
+    let height = percent(50.0);
+
+    commands.spawn((
+        DespawnOnExit(GameState::Creative),
+        Node {
+            flex_direction: FlexDirection::Row,
+            column_gap: percent(5.0),
+            width: percent(70.0),
+            height: percent(10.0),
+            left: percent(30),
+            ..default()
+        },
+        children![(
+            Node {
+                width,
+                height,
+                border: UiRect::all(px(2.0)),
+                // horizontally center child text
+                justify_content: JustifyContent::Center,
+                // vertically center child text
+                align_items: AlignItems::Center,
+                ..default()
+            },
+            BorderColor::all(Color::WHITE),
+            children![(
+                Text::new("Sunray (S)"),
+                theme::title_font(&asset_server),
+                theme::text_color(),
+            )],
+        ),(
+            Node {
+                width,
+                height,
+                border: UiRect::all(px(2.0)),
+                // horizontally center child text
+                justify_content: JustifyContent::Center,
+                // vertically center child text
+                align_items: AlignItems::Center,
+                ..default()
+            },
+            BorderColor::all(Color::WHITE),
+            children![(
+                Text::new("Aseroid (A)"),
+                theme::title_font(&asset_server),
+                theme::text_color(),
+            )],
+        )],
+    ));
+
     for i in 0..=id {
         orchestrator.send_to_planet_id(i, OrchestratorToPlanet::StartPlanetAI);
         match orchestrator
@@ -98,6 +151,30 @@ fn setup(mut commands: Commands, asset_server: Res<AssetServer>) {
     }
 
     commands.insert_resource(orchestrator);
+}
+
+fn create_event_listen(mut commands: Commands, planet: Single<Entity, With<Planet>>, keyboard_input: Res<ButtonInput<KeyCode>>) {
+    if keyboard_input.just_pressed(KeyCode::KeyS) {
+        commands.spawn((
+            DespawnOnExit(GameState::Creative),
+            GalaxyEvent::Sunray,
+            EventTarget {
+                planet: *planet,
+                duration: Timer::from_seconds(3.0, TimerMode::Once),
+            },
+        ));
+    }
+
+    if keyboard_input.just_pressed(KeyCode::KeyA) {
+        commands.spawn((
+            DespawnOnExit(GameState::Creative),
+            GalaxyEvent::Asteroid,
+            EventTarget {
+                planet: *planet,
+                duration: Timer::from_seconds(3.0, TimerMode::Once),
+            },
+        ));
+    }
 }
 
 fn check_entities_and_end_game(
